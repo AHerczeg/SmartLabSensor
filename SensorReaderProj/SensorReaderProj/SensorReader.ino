@@ -53,6 +53,10 @@ double BMP180Pressure = 0;    //// hPa
 double BMP180Temperature = 0; //// Celsius
 double BMP180Altitude = 0;    //// Meters
 
+double oldTemperature = 0;
+double oldHmd = 0;
+double oldVisible = 0;
+
 bool Si7020OK = false;
 double Si7020Temperature = 0; //// Celsius
 double Si7020Humidity = 0;    //// %Relative Humidity
@@ -194,8 +198,29 @@ void loop(void)
     const char* path = "/Logs";
 
     String tempStr = "";
+    bool change = false;
 
-    String sensorString = tempStr+"{\"CoreID\":\"" + getCoreID() +"\", \"Light\":" + Si1132Visible +", \"Temp\":"+Si7020Temperature+", \"Humidity\":" +Si7020Humidity+"}";
+    String sensorString = tempStr+"{\"CoreID\":\"" + getCoreID();
+
+    if(oldTemperature != Si7020Temperature)
+    {
+      sensorString = sensorString + "\", \"Temp\":"+Si7020Temperature;
+      oldTemperature = Si7020Temperature;
+    }
+
+    if(oldHmd != Si7020Humidity)
+    {
+      sensorString = sensorString + "\", \"Humidity\":"+Si7020Humidity;
+      oldHmd = Si7020Humidity;
+    }
+
+    if(oldVisible != Si1132Visible)
+    {
+      sensorString = sensorString + "\", \"Light\":" + Si1132Visible;
+      oldVisible = Si1132Visible;
+    }
+
+    sensorString = sensorString + "}";
 
     Serial.println(sensorString);
     String responseString = "";
