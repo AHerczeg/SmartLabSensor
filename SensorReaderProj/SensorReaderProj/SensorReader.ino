@@ -201,27 +201,32 @@ void loop(void)
     String tempStr = "";
     bool change = false;
 
-    String sensorString;
+    String sensorString = tempStr+"{\"CoreID\":\"" + getCoreID() + "\"";
+    double diff = oldTmp-Si7020Temperature;
 
-    if(oldTmp-Si7020Temperature > THRESHOLD || oldTmp-Si7020Temperature < THRESHOLD)
+    if(abs(diff) > THRESHOLD)
     {
       oldTmp = Si7020Temperature;
+      sensorString = sensorString + ", \"Temp\":"+Si7020Temperature;
       change = true;
     }
 
-    if(oldHmd-Si7020Humidity > THRESHOLD || oldHmd-Si7020Humidity < THRESHOLD)
+    diff = oldHmd-Si7020Humidity;
+    if(abs(diff) > THRESHOLD)
     {
       oldHmd = Si7020Humidity;
+      sensorString = sensorString + ", \"Humidity\":"+Si7020Humidity;
       change = true;
     }
 
     if(oldVisible != Si1132Visible)
     {
       oldVisible = Si1132Visible;
+      sensorString = sensorString + ", \"Light\":" + Si1132Visible;
       change = true;
     }
 
-    sensorString = tempStr+"{\"CoreID\":\"" + getCoreID() +"\", \"Light\":" + Si1132Visible +", \"Temp\":"+Si7020Temperature+", \"Humidity\":" +Si7020Humidity+"}";
+    sensorString = sensorString + "}";
 
     Serial.println(sensorString);
     String responseString = "";
