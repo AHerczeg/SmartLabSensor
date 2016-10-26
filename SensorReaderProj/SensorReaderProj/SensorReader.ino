@@ -200,23 +200,23 @@ void loop(void)
     String tempStr = "";
     bool change = false;
 
-    String sensorString = tempStr+"{\"CoreID\":\"" + getCoreID();
+    String sensorString = tempStr+"{\"CoreID\":\"" + getCoreID() + "\"";
 
     if(oldTemperature != Si7020Temperature)
     {
-      sensorString = sensorString + "\", \"Temp\":"+Si7020Temperature;
+      sensorString = sensorString + ", \"Temp\":"+Si7020Temperature;
       oldTemperature = Si7020Temperature;
     }
 
     if(oldHmd != Si7020Humidity)
     {
-      sensorString = sensorString + "\", \"Humidity\":"+Si7020Humidity;
+      sensorString = sensorString + ", \"Humidity\":"+Si7020Humidity;
       oldHmd = Si7020Humidity;
     }
 
     if(oldVisible != Si1132Visible)
     {
-      sensorString = sensorString + "\", \"Light\":" + Si1132Visible;
+      sensorString = sensorString + ", \"Light\":" + Si1132Visible;
       oldVisible = Si1132Visible;
     }
 
@@ -229,7 +229,7 @@ void loop(void)
 
 
 
-    Particle.publish("photonSensorData",responseString, PRIVATE);
+    Particle.publish("photonSensorData",sensorString, PRIVATE);
 
     delay(1000);
 }
