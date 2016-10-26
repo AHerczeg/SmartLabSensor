@@ -21,6 +21,7 @@ int SLEEP_DELAY = 0;    //// 40 seconds (runs x1) - should get about 24 hours on
 String SLEEP_DELAY_MIN = "15"; // seconds - easier to store as string then convert to int
 String SLEEP_DELAY_STATUS = "OK"; // always OK to start with
 int RELAX_DELAY = 5; // seconds (runs x1) - no power impact, just idle/relaxing
+double THRESHOLD = 0.5; //Threshold for temperature and humidity changes
 
 // Variables for the I2C scan
 byte I2CERR, I2CADR;
@@ -53,7 +54,7 @@ double BMP180Pressure = 0;    //// hPa
 double BMP180Temperature = 0; //// Celsius
 double BMP180Altitude = 0;    //// Meters
 
-double oldTemperature = 0;
+double oldTmp = 0;
 double oldHmd = 0;
 double oldVisible = 0;
 
@@ -200,32 +201,33 @@ void loop(void)
     String tempStr = "";
     bool change = false;
 
-    String sensorString = tempStr+"{\"CoreID\":\"" + getCoreID() + "\"";
+    String sensorString;
 
-    if(oldTemperature != Si7020Temperature)
+    if(oldTmp-Si7020Temperature > THRESHOLD || oldTmp-Si7020Temperature < THRESHOLD)
     {
-      sensorString = sensorString + ", \"Temp\":"+Si7020Temperature;
-      oldTemperature = Si7020Temperature;
+      oldTmp = Si7020Temperature;
+      change = true;
     }
 
-    if(oldHmd != Si7020Humidity)
+    if(oldHmd-Si7020Humidity > THRESHOLD || oldHmd-Si7020Humidity < THRESHOLD)
     {
-      sensorString = sensorString + ", \"Humidity\":"+Si7020Humidity;
       oldHmd = Si7020Humidity;
+      change = true;
     }
 
     if(oldVisible != Si1132Visible)
     {
-      sensorString = sensorString + ", \"Light\":" + Si1132Visible;
       oldVisible = Si1132Visible;
+      change = true;
     }
 
-    sensorString = sensorString + "}";
+    sensorString = tempStr+"{\"CoreID\":\"" + getCoreID() +"\", \"Light\":" + Si1132Visible +", \"Temp\":"+Si7020Temperature+", \"Humidity\":" +Si7020Humidity+"}";
 
     Serial.println(sensorString);
     String responseString = "";
 
-    client.post(path, (const char*) sensorString, &responseString);
+    if(change)
+      client.post(path, (const char*) sensorString, &responseString);
 
 
 
