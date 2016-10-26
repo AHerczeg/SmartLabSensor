@@ -203,21 +203,18 @@ void loop(void)
     // IF light value increase above THRESHOLD post interaction start, save response as LogID, wait until light level is back to standard level and post interactin end
     if(Si1132Visible - standardOff > THRESHOLD)
     {
-        //tempStandardOff = standardOff;
         sensorString = tempStr+"{\"CoreID\":\"" + getCoreID() +"\", \"Type\":" + "Fridge" +", \"Stage\":"+ "Start" +"}";
-        //client.post(path, (const char*) sensorString, &responseString);
-        Particle.publish("photonSensorData",sensorString, PRIVATE);
+        client.post(path, (const char*) sensorString, &responseString);
+        //Particle.publish("photonSensorData",sensorString, PRIVATE);
         while(Si1132Visible - standardOff > THRESHOLD)
           readSi1132Sensor();
         sensorString = tempStr+"{\"CoreID\":\"" + getCoreID() +"\", \"Type\":" + "Fridge" +", \"Stage\":"+ "End" +", \"LogID\":" + responseString +"}";
-        //client.post(path, (const char*) sensorString, &responseString);
-        Particle.publish("photonSensorData",sensorString, PRIVATE);
-        //tempStandardOff = standardOff;
+        client.post(path, (const char*) sensorString, &responseString);
+        //Particle.publish("photonSensorData",sensorString, PRIVATE);
     }
 
     delay(100);
 
-    //Particle.publish("photonSensorData",sensorString, PRIVATE);
 }
 
 String getCoreID(){
