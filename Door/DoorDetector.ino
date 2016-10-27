@@ -21,7 +21,7 @@ int SLEEP_DELAY = 0;    //// 40 seconds (runs x1) - should get about 24 hours on
 String SLEEP_DELAY_MIN = "15"; // seconds - easier to store as string then convert to int
 String SLEEP_DELAY_STATUS = "OK"; // always OK to start with
 int RELAX_DELAY = 5; // seconds (runs x1) - no power impact, just idle/relaxing
-int THRESHOLD = 1; //Threshold for change
+int THRESHOLD = 1000; //Threshold for change
 
 // Variables for the I2C scan
 byte I2CERR, I2CADR;
@@ -58,8 +58,10 @@ double oldTmp = 0;
 double oldHmd = 0;
 double oldVisible = 0;
 
-double standardX = 0;
-double standardY = 0;
+int standardX = 0;
+int standardY = 0;
+int standardZ = 0;
+bool call = false;
 
 bool Si7020OK = false;
 double Si7020Temperature = 0; //// Celsius
@@ -72,7 +74,6 @@ double Si1132UVIndex = 0; //// UV Index scoring is as follows: 1-2  -> Low,
 double Si1132Visible = 0; //// Lux
 double Si1132InfraRed = 0; //// Lux
 
-bool change = false;
 
 MPU9150 mpu9150;
 bool ACCELOK = false;
@@ -124,8 +125,6 @@ void setup()
 
     // initialises MPU9150 inertial measure unit
     initialiseMPU9150();
-
-    calibrateTilt();
 }
 
 void initialiseMPU9150()
@@ -177,6 +176,11 @@ void loop(void)
 
     //// allows sensors time to warm up
     delay(SENSORDELAY);
+    if(!call)
+    {
+      calibrateTilt();
+      call = true;
+    }
 
     //// ***********************************************************************
 
@@ -188,33 +192,44 @@ void loop(void)
 
     String tempStr = "";
 
-    String sensorString = tempStr+"{\"CoreID\":\"" + getCoreID() + "\"";
-    double diffX = standardX - getXTilt(ax, az);
-    double diffY = standardY - getYTilt(ay, az);
+    String sensorString;
+    bool change = getAngleChange();
 
-    if(abs(diffX) > THRESHOLD || abs(diffY) > THRESHOLD)
+    if(change)
     {
-      sensorString = tempStr+"{\"CoreID\":\"" + getCoreID() +"\", \"Type\":" + "Door" +", \"Stage\":"+ "Start" +"}";
+      change=false;
+      sensorString = tempStr+"{\"CoreID\":\"" + getCoreID() +"\", \"Type\": \"Fridge\" , \"Stage\": \"Start\" }";
       String responseString = "";
       client.post(path, (const char*) sensorString, &responseString);
 
       String tempLog = responseString.substring(9);
       String logID = tempLog.substring(0, tempLog.length()-1);
-      while(abs(diffX) > THRESHOLD || abs(diffY) > THRESHOLD)
+      delay(200);
+      while(!change)
       {
         readMPU9150();
-        diffX = standardX - getXTilt(ax, az);
-        diffY = standardY - getYTilt(ay, az);
+        change = getAngleChange();
         delay(100);
       }
       sensorString = tempStr+"{\"CoreID\":\"" + getCoreID() +"\", \"Type\": \"Door\" , \"Stage\": \"End\" , \"LogID\":" + logID +"}";
       client.post(path, (const char*) sensorString, &responseString);
     }
 
-    sensorString = sensorString + " "+ getXTilt(ax, az) + " " + getYTilt(ay, az);
     Particle.publish("photonSensorData",sensorString, PRIVATE);
 
-    delay(100);
+    delay(200);
+}
+
+bool getAngleChange()
+{
+  int diffX = gx - standardX;
+  int diffY = gy - standardY;
+  int diffZ = gz - standardZ;
+
+  if(abs(diffX) > THRESHOLD || abs(diffY) > THRESHOLD || abs(diffZ) > THRESHOLD)
+    return true;
+  else
+    return false;
 }
 
 String getCoreID(){
@@ -287,13 +302,11 @@ float getAccel(float x)
 //// returns tilt along x axis in radians - uses accelerometer
 float getXTilt(float accelX, float accelZ)
 {
-   float tilt = atan2(accelX,accelZ);//*RAD_TO_DEGREES; //*RAD_TO_DEGREES;
-   /**
+   float tilt = atan2(accelX,accelZ)*RAD_TO_DEGREES; //*RAD_TO_DEGREES;
    if(tilt < 0)
    {
       tilt = tilt+360.0;
    }
-   **/
 
    return tilt;
 }
@@ -301,13 +314,11 @@ float getXTilt(float accelX, float accelZ)
 //// returns tilt along y-axis in radians
 float getYTilt(float accelY, float accelZ)
 {
-   float tilt = atan2(accelY,accelZ);//*RAD_TO_DEGREES;
-   /**
+   float tilt = atan2(accelY,accelZ)*RAD_TO_DEGREES;//*RAD_TO_DEGREES;
    if(tilt < 0)
    {
      tilt = tilt+360.0;
    }
-   **/
 
    return tilt;
 }
@@ -327,6 +338,7 @@ void calibrateTilt()
 {
   readMPU9150();
 
-  standardX = getXTilt(ax, az);
-  standardY = getYTilt(ay, az);
+  standardX = gx;
+  standardY = gy;
+  standardZ = gz;
 }
