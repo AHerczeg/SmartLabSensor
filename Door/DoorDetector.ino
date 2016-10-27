@@ -176,9 +176,11 @@ void loop(void)
 
     //// allows sensors time to warm up
     delay(SENSORDELAY);
+
+    //// if defaults have not been set, set them now
     if(!call)
     {
-      calibrateTilt();
+      setDefault();
       call = true;
     }
 
@@ -198,13 +200,13 @@ void loop(void)
     if(change)
     {
       change=false;
-      sensorString = tempStr+"{\"CoreID\":\"" + getCoreID() +"\", \"Type\": \"Fridge\" , \"Stage\": \"Start\" }";
+      sensorString = tempStr+"{\"CoreID\":\"" + getCoreID() +"\", \"Type\": \"Door\" , \"Stage\": \"Start\" }";
       String responseString = "";
       client.post(path, (const char*) sensorString, &responseString);
 
       String tempLog = responseString.substring(9);
       String logID = tempLog.substring(0, tempLog.length()-1);
-      delay(200);
+      delay(200); //Add a delay to avoid premptively closing the door
       while(!change)
       {
         readMPU9150();
@@ -217,9 +219,10 @@ void loop(void)
 
     Particle.publish("photonSensorData",sensorString, PRIVATE);
 
-    delay(200);
+    delay(200);  //Delay again to avoid another interaction being logged
 }
 
+/// Checks if there has been a significant change in rotation about any axis
 bool getAngleChange()
 {
   int diffX = gx - standardX;
@@ -299,42 +302,8 @@ float getAccel(float x)
   return x/pow(2,15)*ACCEL_SCALE;
 }
 
-//// returns tilt along x axis in radians - uses accelerometer
-float getXTilt(float accelX, float accelZ)
-{
-   float tilt = atan2(accelX,accelZ)*RAD_TO_DEGREES; //*RAD_TO_DEGREES;
-   if(tilt < 0)
-   {
-      tilt = tilt+360.0;
-   }
 
-   return tilt;
-}
-
-//// returns tilt along y-axis in radians
-float getYTilt(float accelY, float accelZ)
-{
-   float tilt = atan2(accelY,accelZ)*RAD_TO_DEGREES;//*RAD_TO_DEGREES;
-   if(tilt < 0)
-   {
-     tilt = tilt+360.0;
-   }
-
-   return tilt;
-}
-
-//// returns the vector sum of the acceleration along x, y and z axes
-//// in g units
-float getAccelXYZ(float x, float y, float z)
-{
-  x = getAccel(x);
-  y = getAccel(y);
-  z = getAccel(z);
-
-  return sqrt(x*x+y*y+z*z);
-}
-
-void calibrateTilt()
+void setDefault()
 {
   readMPU9150();
 
