@@ -21,7 +21,7 @@ int SLEEP_DELAY = 0;    //// 40 seconds (runs x1) - should get about 24 hours on
 String SLEEP_DELAY_MIN = "15"; // seconds - easier to store as string then convert to int
 String SLEEP_DELAY_STATUS = "OK"; // always OK to start with
 int RELAX_DELAY = 5; // seconds (runs x1) - no power impact, just idle/relaxing
-double THRESHOLD = 0.5; //Threshold for temperature and humidity changes
+double THRESHOLD = 1; //Threshold for temperature and humidity changes
 
 // Variables for the I2C scan
 byte I2CERR, I2CADR;
@@ -57,6 +57,7 @@ double BMP180Altitude = 0;    //// Meters
 double oldTmp = 0;
 double oldHmd = 0;
 double oldVisible = 0;
+float oldSound = 0;
 
 bool Si7020OK = false;
 double Si7020Temperature = 0; //// Celsius
@@ -199,6 +200,7 @@ void loop(void)
     const char* path = "/Logs";
 
     String tempStr = "";
+    float sound = readSoundLevel();
     bool change = false;
 
     String sensorString = tempStr+"{\"CoreID\":\"" + getCoreID() + "\"";
@@ -219,10 +221,20 @@ void loop(void)
       change = true;
     }
 
-    if(oldVisible != Si1132Visible)
+    diff = oldVisible - Si1132Visible;
+    if(abs(diff) > (THRESHOLD*10))
     {
       oldVisible = Si1132Visible;
       sensorString = sensorString + ", \"Light\":" + Si1132Visible;
+      change = true;
+    }
+
+    float soundDiff = sound*1000 - oldSound*1000;
+    diff = round(soundDiff);
+    if(abs(diff) > (THRESHOLD*10))
+    {
+      oldSound = sound;
+      sensorString = sensorString + ", \"Sound\":" + sound;
       change = true;
     }
 
@@ -233,7 +245,6 @@ void loop(void)
 
     if(change)
       client.post(path, (const char*) sensorString, &responseString);
-
 
 
     Particle.publish("photonSensorData",sensorString, PRIVATE);
@@ -283,4 +294,35 @@ void readSi1132Sensor()
     Si1132UVIndex = si1132.readUV() *0.01;
     Si1132Visible = si1132.readVisible();
     Si1132InfraRed = si1132.readIR();
+}
+
+//returns sound level measurement in as voltage values (0 to 3.3v)
+float readSoundLevel()
+{
+    unsigned int sampleWindow = 50; // Sample window width in milliseconds (50 milliseconds = 20Hz)
+    unsigned long endWindow = millis() + sampleWindow;  // End of sample window
+
+    unsigned int signalSample = 0;
+    unsigned int signalMin = 4095; // Minimum is the lowest signal below which we assume silence
+    unsigned int signalMax = 0; // Maximum signal starts out the same as the Minimum signal
+
+    // collect data for milliseconds equal to sampleWindow
+    while (millis() < endWindow)
+    {
+        signalSample = analogRead(SOUND);
+        if (signalSample > signalMax)
+        {
+            signalMax = signalSample;  // save just the max levels
+        }
+        else if (signalSample < signalMin)
+        {
+            signalMin = signalSample;  // save just the min levels
+        }
+    }
+
+    //SOUNDV = signalMax - signalMin;  // max - min = peak-peak amplitude
+    SOUNDV = mapFloat((signalMax - signalMin), 0, 4095, 0, 3.3);
+
+    //return 1;
+    return SOUNDV;
 }
