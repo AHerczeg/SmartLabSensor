@@ -3,7 +3,6 @@
 #include "math.h"
 #include "rest_client.h"
 
-
 //// ***************************************************************************
 //// ***************************************************************************
 
@@ -198,19 +197,26 @@ void loop(void)
 
     RestClient client = RestClient("sccug-330-04.lancs.ac.uk",8000);
 
-    const char* path = "/Logs";
+    const char* path = "/Interaction";
 
     // IF light value increase above THRESHOLD post interaction start, save response as LogID, wait until light level is back to standard level and post interactin end
     if(Si1132Visible - standardOff > THRESHOLD)
     {
-        sensorString = tempStr+"{\"CoreID\":\"" + getCoreID() +"\", \"Type\":" + "Fridge" +", \"Stage\":"+ "Start" +"}";
+        sensorString = tempStr+"{\"CoreID\":\"" + getCoreID() +"\", \"Type\": \"Fridge\" , \"Stage\": \"Start\" }";
         client.post(path, (const char*) sensorString, &responseString);
-        //Particle.publish("photonSensorData",sensorString, PRIVATE);
+        sensorString = tempStr+"visible: "+ Si1132Visible+" standardOff: "+standardOff;
+        Serial.println(sensorString);
+        String tempLog = responseString.substring(9);
+        String logID = tempLog.substring(0, tempLog.length()-1);
         while(Si1132Visible - standardOff > THRESHOLD)
+        {
           readSi1132Sensor();
-        sensorString = tempStr+"{\"CoreID\":\"" + getCoreID() +"\", \"Type\":" + "Fridge" +", \"Stage\":"+ "End" +", \"LogID\":" + responseString +"}";
+          sensorString = tempStr+"visible: "+ Si1132Visible+" standardOff: "+standardOff;
+          Serial.println(sensorString);
+          delay(100);
+        }
+        sensorString = tempStr+"{\"CoreID\":\"" + getCoreID() +"\", \"Type\": \"Fridge\" , \"Stage\": \"End\" , \"LogID\":" + logID +"}";
         client.post(path, (const char*) sensorString, &responseString);
-        //Particle.publish("photonSensorData",sensorString, PRIVATE);
     }
 
     delay(100);
