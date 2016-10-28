@@ -21,7 +21,7 @@ int SLEEP_DELAY = 0;    //// 40 seconds (runs x1) - should get about 24 hours on
 String SLEEP_DELAY_MIN = "15"; // seconds - easier to store as string then convert to int
 String SLEEP_DELAY_STATUS = "OK"; // always OK to start with
 int RELAX_DELAY = 5; // seconds (runs x1) - no power impact, just idle/relaxing
-int THRESHOLD = 1000; //Threshold for change
+int THRESHOLD = 1300; //Threshold for change
 
 // Variables for the I2C scan
 byte I2CERR, I2CADR;
@@ -194,7 +194,7 @@ void loop(void)
 
     String tempStr = "";
 
-    String sensorString;
+    String sensorString = "Closed";
     bool change = getAngleChange();
 
     if(change)
@@ -206,7 +206,7 @@ void loop(void)
 
       String tempLog = responseString.substring(9);
       String logID = tempLog.substring(0, tempLog.length()-1);
-      delay(200); //Add a delay to avoid premptively closing the door
+      delay(500); //Add a delay to avoid premptively closing the door
       while(!change)
       {
         readMPU9150();
@@ -215,6 +215,7 @@ void loop(void)
       }
       sensorString = tempStr+"{\"CoreID\":\"" + getCoreID() +"\", \"Type\": \"Door\" , \"Stage\": \"End\" , \"LogID\":" + logID +"}";
       client.post(path, (const char*) sensorString, &responseString);
+      delay(300);
     }
 
     Particle.publish("photonSensorData",sensorString, PRIVATE);
