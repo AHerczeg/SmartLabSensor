@@ -21,7 +21,8 @@ int SLEEP_DELAY = 0;    //// 40 seconds (runs x1) - should get about 24 hours on
 String SLEEP_DELAY_MIN = "15"; // seconds - easier to store as string then convert to int
 String SLEEP_DELAY_STATUS = "OK"; // always OK to start with
 int RELAX_DELAY = 5; // seconds (runs x1) - no power impact, just idle/relaxing
-double THRESHOLD = 1; //Threshold for temperature and humidity changes
+double THRESHOLD = 0.5; //Threshold for temperature and humidity changes
+int THRES_LS = 5; // Threshold for light and sound changes
 
 // Variables for the I2C scan
 byte I2CERR, I2CADR;
@@ -57,7 +58,7 @@ double BMP180Altitude = 0;    //// Meters
 double oldTmp = 0;
 double oldHmd = 0;
 double oldVisible = 0;
-float oldSound = 0;
+double oldSound = 0;
 
 bool Si7020OK = false;
 double Si7020Temperature = 0; //// Celsius
@@ -184,23 +185,12 @@ void loop(void)
     readSi1132Sensor();
 
 
-
-    //Serial.print("Accel_X:"); Serial.print(accelX); Serial.print("\t");
-    //Serial.print("Accel_Y:"); Serial.print(accelY); Serial.print("\t");
-    //Serial.print("Accel_Z:"); Serial.print(accelZ); Serial.print("\t");
-    //Serial.print("Accel_XYZ:"); Serial.println(accelXYZ);
-
-    //Serial.print("Compass_X:"); Serial.print(cx); Serial.print("\t");
-    //Serial.print("Compass_Y:"); Serial.print(cy); Serial.print("\t");
-    //Serial.print("Compass_Z:"); Serial.println(getCompassZ(cz));
-
-
     RestClient client = RestClient("sccug-330-04.lancs.ac.uk",8000);
 
     const char* path = "/Logs";
 
     String tempStr = "";
-    float sound = readSoundLevel();
+    double sound = readSoundLevel();
     bool change = false;
 
     String sensorString = tempStr+"{\"CoreID\":\"" + getCoreID() + "\"";
@@ -229,9 +219,9 @@ void loop(void)
       change = true;
     }
 
-    float soundDiff = sound*1000 - oldSound*1000;
-    diff = round(soundDiff);
-    if(abs(diff) > (THRESHOLD*10))
+    double soundDiff = sound*1000 - oldSound*1000;
+    diff = lround(soundDiff);
+    if(abs(diff) > lround(THRESHOLD*24))
     {
       oldSound = sound;
       sensorString = sensorString + ", \"Sound\":" + sound;
@@ -239,6 +229,7 @@ void loop(void)
     }
 
     sensorString = sensorString + "}";
+    //WiFi RSSI guide: >50, it's in zone 1; between 50 and 45, in zone 2; <45, in zone 3
 
     Serial.println(sensorString);
     String responseString = "";
@@ -246,7 +237,7 @@ void loop(void)
     if(change)
       client.post(path, (const char*) sensorString, &responseString);
 
-
+    sensorString = sensorString+" "+(oldVisible)+" "+Si1132Visible;
     Particle.publish("photonSensorData",sensorString, PRIVATE);
 
     delay(1000);
