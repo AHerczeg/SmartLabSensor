@@ -71,6 +71,10 @@ double Si1132UVIndex = 0; //// UV Index scoring is as follows: 1-2  -> Low,
 double Si1132Visible = 0; //// Lux
 double Si1132InfraRed = 0; //// Lux
 
+float strength = 0;
+float old_strength = 64;
+float alpha = 0.09;
+
 MPU9150 mpu9150;
 bool ACCELOK = false;
 int cx, cy, cz, ax, ay, az, gx, gy, gz;
@@ -187,7 +191,7 @@ void loop(void)
 
     RestClient client = RestClient("sccug-330-04.lancs.ac.uk",8000);
 
-    const char* path = "/Logs";
+    const char* path = "/LocTracking";
 
     String tempStr = "";
     double sound = readSoundLevel();
@@ -195,7 +199,7 @@ void loop(void)
 
     String sensorString = tempStr+"{\"CoreID\":\"" + getCoreID() + "\"";
     double diff = oldTmp-Si7020Temperature;
-
+/**
     if(abs(diff) > THRESHOLD)
     {
       oldTmp = Si7020Temperature;
@@ -227,17 +231,38 @@ void loop(void)
       sensorString = sensorString + ", \"Sound\":" + sound;
       change = true;
     }
-
-    sensorString = sensorString + "}";
+**/
     //WiFi RSSI guide: >50, it's in zone 1; between 50 and 45, in zone 2; <45, in zone 3
+    int reading = -(WiFi.RSSI());
+    int f;
+    strength = alpha * reading + (1 - alpha)* old_strength; // Simple low pass filter
+
+    f = round(strength); // Floats comparison are unreliable, so we use an int
+
+    if(f > 0)
+    {
+      old_strength = strength; //  If the value is usable, replace old_strength
+      int pos = 0;
+      if(f < 45)
+        pos=1;
+      else if((50 >= f) && (f >= 45))
+        pos = 2;
+      else if(f > 50)
+        pos = 3;
+      sensorString = sensorString + ", \"RoomID\":" + pos;
+    }
+    sensorString = sensorString + "}";
 
     Serial.println(sensorString);
     String responseString = "";
 
     if(change)
+    {
+      //WiFi.on();
       client.post(path, (const char*) sensorString, &responseString);
+    }
 
-    sensorString = sensorString+" "+(oldVisible)+" "+Si1132Visible;
+    sensorString = sensorString+" "+f+" "+(f >= 45)+" "+(50 >= f);
     Particle.publish("photonSensorData",sensorString, PRIVATE);
 
     delay(1000);
