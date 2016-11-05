@@ -81,6 +81,7 @@ bool ACCELOK = false;
 int cx, cy, cz, ax, ay, az, gx, gy, gz;
 double tm; //// Celsius
 int limit_3 = 50;
+int limit_2 = 45;
 
 Si1132 si1132 = Si1132();
 
@@ -127,7 +128,8 @@ void setup()
 
     // initialises MPU9150 inertial measure unit
     initialiseMPU9150();
-    Particle.subscribe("wifiStrengthIndicator", updateStrength);
+    Particle.subscribe("wifiZone3", updateLimit3);
+    Particle.subscribe("wifiZone2", updateLimit2);
 }
 
 void initialiseMPU9150()
@@ -201,7 +203,6 @@ void loop(void)
     bool change = false;
 
     String sensorString = tempStr+"{\"CoreID\":\"" + getCoreID() + "\"";
-    Particle.publish("photonSensorData","Stage 1", PRIVATE);
     double diff = oldTmp-Si7020Temperature;
 /**
     if(abs(diff) > THRESHOLD)
@@ -254,9 +255,9 @@ void loop(void)
     {
       old_strength = strength; //  If the value is usable, replace old_strength
       int pos = 0;
-      if(f < 45)
+      if(f < limit_2)
         pos=1;
-      else if((limit_3 >= f) && (f >= 45))
+      else if((limit_3 >= f) && (f >= limit_2))
         pos = 2;
       else if(f > limit_3)
         pos = 3;
@@ -285,9 +286,14 @@ void loop(void)
     delay(1000);
 }
 
-void updateStrength(const char *event, const char *data)
+void updateLimit3(const char *event, const char *data)
 {
   limit_3 = (int) data;
+}
+
+void updateLimit2(const char *event, const char *data)
+{
+  limit_2 = (int) data;
 }
 
 String getCoreID(){
