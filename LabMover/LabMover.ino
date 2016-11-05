@@ -73,7 +73,7 @@ double Si1132Visible = 0; //// Lux
 double Si1132InfraRed = 0; //// Lux
 
 float strength = 0;
-float old_strength = 50;
+float old_strength = 0;
 float alpha = 0.09;
 
 MPU9150 mpu9150;
@@ -201,6 +201,7 @@ void loop(void)
     bool change = false;
 
     String sensorString = tempStr+"{\"CoreID\":\"" + getCoreID() + "\"";
+    Particle.publish("photonSensorData","Stage 1", PRIVATE);
     double diff = oldTmp-Si7020Temperature;
 /**
     if(abs(diff) > THRESHOLD)
@@ -236,9 +237,16 @@ void loop(void)
     }
 **/
     //WiFi RSSI guide: >50, it's in zone 1; between 50 and 45, in zone 2; <45, in zone 3
-    int reading = -(WiFi.RSSI());
-    int f;
-    strength = alpha * reading + (1 - alpha)* old_strength; // Simple low pass filter
+    int reading = -(WiFi.RSSI()); //RSSI value is negative, this makes comparisons more readable
+    int f = 0;
+
+    if(reading > 0) // WiFi.RSSI returns positive values as error codes, they need to be ignored
+    {
+      if(old_strength > 0)
+        strength = alpha * reading + (1 - alpha)* old_strength; // Simple low pass filter
+      else
+        strength = reading;
+    }
 
     f = round(strength); // Floats comparison are unreliable, so we use an int
 
@@ -253,7 +261,7 @@ void loop(void)
       else if(f > limit_3)
         pos = 3;
 
-      if(pos > 0 && oldPos != pos)
+      if(pos > 0 && oldPos != pos) // Avoid creating messages unless position has changed
       {
         sensorString = sensorString + ", \"RoomID\":" + pos;
         oldPos = pos;
@@ -271,7 +279,7 @@ void loop(void)
       client.post(path, (const char*) sensorString, &responseString);
     }
 
-    sensorString = sensorString+" "+oldPos+" "+f+" "+reading+" "+change;
+    sensorString = sensorString+" "+oldPos+" "+f+" "+reading+" "+limit_3;
     Particle.publish("photonSensorData",sensorString, PRIVATE);
 
     delay(1000);
