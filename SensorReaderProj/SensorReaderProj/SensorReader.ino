@@ -78,6 +78,12 @@ double tm; //// Celsius
 
 Si1132 si1132 = Si1132();
 
+int inputPin = D6; // PIR motion sensor. D6 goes HIGH when motion is detected and LOW when
+                   // there's no motion.
+
+int sensorState = LOW;        // Start by assuming no motion detected
+int sensorValue = 0;
+
 //// ***************************************************************************
 
 
@@ -121,6 +127,9 @@ void setup()
 
     // initialises MPU9150 inertial measure unit
     initialiseMPU9150();
+
+    // Initialize motion sensor input pin
+    pinMode(inputPin, INPUT);
 }
 
 void initialiseMPU9150()
@@ -227,6 +236,16 @@ void loop(void)
       sensorString = sensorString + ", \"Sound\":" + sound;
       change = true;
     }
+
+    if (sensorValue == HIGH && sensorState == LOW)   // If the input pin is HIGH turn LED ON
+    {
+       sensorString =  sensorString + ", \"Motion\": 1";
+       sensorState = HIGH;                    // preserves current sensor state
+    } else if (sensorValue == LOW && sensorState == HIGH) {
+        sensorString = sensorString + ", \"Motion\": 0";
+        sensorState = LOW;                    // preserves current sensor state
+    }
+
 
     sensorString = sensorString + "}";
     //WiFi RSSI guide: >50, it's in zone 1; between 50 and 45, in zone 2; <45, in zone 3
