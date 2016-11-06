@@ -193,7 +193,6 @@ void loop(void)
     readWeatherSi7020();
     readSi1132Sensor();
 
-
     RestClient client = RestClient("sccug-330-04.lancs.ac.uk",8000);
 
     const char* path = "/Logs";
@@ -201,11 +200,37 @@ void loop(void)
     String tempStr = "";
     double sound = readSoundLevel();
     bool change = false;
+    bool motionChange = false;
+    bool regularUpdate =  (time.minute() == 0 || time.minute() == 30);
 
     String sensorString = tempStr+"{\"CoreID\":\"" + getCoreID() + "\"";
     double diff = oldTmp-Si7020Temperature;
 
-    if(abs(diff) > THRESHOLD)
+
+    // THESE TWO MUST ALWAYS BE ON TOP! V
+
+    if (sensorValue == HIGH && sensorState == LOW)   // If the input pin is HIGH turn LED ON
+    {
+       sensorString =  sensorString + ", \"Motion\": 1";
+       sensorState = HIGH;                 // preserves current sensor state
+       change = true;
+    } else if (sensorValue == LOW && sensorState == HIGH) {
+        sensorString = sensorString + ", \"Motion\": 0";
+        sensorState = LOW;                   // preserves current sensor state
+        change = true;
+    }
+
+    if(regularUpdate && !change)
+    {
+       if (sensorState == HIGH)
+        sensorString = sensorString + ", \"Motion\": 1";
+       else
+        sensorString = sensorString + ", \"Motion\": 0";
+    }
+
+    // THESE TWO MUST ALWAYS BE ON TOP! ^
+
+    if(abs(diff) > THRESHOLD || regularUpdate)
     {
       oldTmp = Si7020Temperature;
       sensorString = sensorString + ", \"Temp\":"+Si7020Temperature;
@@ -213,7 +238,7 @@ void loop(void)
     }
 
     diff = oldHmd-Si7020Humidity;
-    if(abs(diff) > THRESHOLD)
+    if(abs(diff) > THRESHOLD || regularUpdate)
     {
       oldHmd = Si7020Humidity;
       sensorString = sensorString + ", \"Humidity\":"+Si7020Humidity;
@@ -221,7 +246,7 @@ void loop(void)
     }
 
     diff = oldVisible - Si1132Visible;
-    if(abs(diff) > (THRESHOLD*10))
+    if(abs(diff) > (THRESHOLD*10) || regularUpdate)
     {
       oldVisible = Si1132Visible;
       sensorString = sensorString + ", \"Light\":" + Si1132Visible;
@@ -230,21 +255,13 @@ void loop(void)
 
     double soundDiff = sound*1000 - oldSound*1000;
     diff = lround(soundDiff);
-    if(abs(diff) > lround(THRESHOLD*24))
+    if(abs(diff) > lround(THRESHOLD*24) || regularUpdate)
     {
       oldSound = sound;
       sensorString = sensorString + ", \"Sound\":" + sound;
       change = true;
     }
 
-    if (sensorValue == HIGH && sensorState == LOW)   // If the input pin is HIGH turn LED ON
-    {
-       sensorString =  sensorString + ", \"Motion\": 1";
-       sensorState = HIGH;                    // preserves current sensor state
-    } else if (sensorValue == LOW && sensorState == HIGH) {
-        sensorString = sensorString + ", \"Motion\": 0";
-        sensorState = LOW;                    // preserves current sensor state
-    }
 
 
     sensorString = sensorString + "}";
@@ -253,7 +270,9 @@ void loop(void)
     Serial.println(sensorString);
     String responseString = "";
 
-    if(change)
+    // || time.minute() == 0 || time.minute() == 30
+
+    if(change || regularUpdate)
       client.post(path, (const char*) sensorString, &responseString);
 
     sensorString = sensorString+" "+(oldVisible)+" "+Si1132Visible;
