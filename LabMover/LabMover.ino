@@ -236,8 +236,7 @@ void loop(void)
       sensorString = sensorString + ", \"Sound\":" + sound;
       change = true;
     }
-**/
-    //WiFi RSSI guide: >50, it's in zone 1; between 50 and 45, in zone 2; <45, in zone 3
+**/    
     int reading = -(WiFi.RSSI()); //RSSI value is negative, this makes comparisons more readable
     int f = 0;
 
@@ -275,10 +274,7 @@ void loop(void)
     String responseString = "";
 
     if(change)
-    {
-      //WiFi.on();
       client.post(path, (const char*) sensorString, &responseString);
-    }
 
     sensorString = sensorString+" "+oldPos+" "+f+" "+reading+" "+limit_3;
     Particle.publish("photonSensorData",sensorString, PRIVATE);
@@ -288,12 +284,16 @@ void loop(void)
 
 void updateLimit3(const char *event, const char *data)
 {
-  limit_3 = (int) data;
+  String s = String(data);
+  limit_3 = -(s.toInt());
+  limit_2 = limit_3 - 5;
 }
 
 void updateLimit2(const char *event, const char *data)
 {
-  limit_2 = (int) data;
+  String s = String(data);
+  limit_2 = s.toInt();
+  limit_3 = limit_2 + 5; // Limit 2 and 3 are 5 units apart
 }
 
 String getCoreID(){
