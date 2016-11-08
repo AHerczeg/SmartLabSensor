@@ -279,7 +279,7 @@ void loop(void)
 
     double soundDiff = sound*1000 - oldSound*1000;
     diff = lround(soundDiff);
-    if(abs(diff) > lround(THRESHOLD*24) || startUpdate)
+    if(abs(diff) > lround(THRESHOLD*46) || startUpdate)
     {
       oldSound = sound;
       sensorString = sensorString + ", \"Sound\":" + sound;
@@ -301,7 +301,8 @@ void loop(void)
     if(change)
       client.post(path, (const char*) sensorString, &responseString);
 
-    sensorString = sensorString+" "+(oldVisible)+" "+Si1132Visible;
+    sensorString = sensorString+" "+(THRESHOLD*46)+" "+abs(soundDiff);
+    Particle.publish("photonSensorData",sensorString, PRIVATE);
 
     String rTime = tempStr + "" + (int)time;
 
