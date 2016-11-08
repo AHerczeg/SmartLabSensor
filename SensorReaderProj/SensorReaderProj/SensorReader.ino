@@ -21,8 +21,9 @@ int SLEEP_DELAY = 0;    //// 40 seconds (runs x1) - should get about 24 hours on
 String SLEEP_DELAY_MIN = "15"; // seconds - easier to store as string then convert to int
 String SLEEP_DELAY_STATUS = "OK"; // always OK to start with
 int RELAX_DELAY = 5; // seconds (runs x1) - no power impact, just idle/relaxing
-double THRESHOLD = 0.5; //Threshold for temperature and humidity changes
-int THRES_LS = 5; // Threshold for light and sound changes
+double THRESHOLD = 1.0; //Threshold for temperature and humidity changes
+int THRES_L = 5; // Threshold for light changes
+int THRES_S = 23; // Threshold for sound changes
 
 // Variables for the I2C scan
 byte I2CERR, I2CADR;
@@ -75,6 +76,7 @@ MPU9150 mpu9150;
 bool ACCELOK = false;
 int cx, cy, cz, ax, ay, az, gx, gy, gz;
 double tm; //// Celsius
+bool change = false;
 
 Si1132 si1132 = Si1132();
 
@@ -204,7 +206,6 @@ void loop(void)
 
     String tempStr = "";
     double sound = readSoundLevel();
-    bool change = false;
     bool motionChange = false;
     time_t time = Time.minute();
     bool runUpdate =  ( (int)time == 0 || (int)time == 30);
@@ -254,39 +255,21 @@ void loop(void)
 
     // THESE TWO MUST ALWAYS BE ON TOP! ^
 
-    if(abs(diff) > THRESHOLD || startUpdate)
-    {
-      oldTmp = Si7020Temperature;
-      sensorString = sensorString + ", \"Temp\":"+Si7020Temperature;
-      change = true;
-    }
+    String check = getChange(Si7020Temperature, oldTmp, THRESHOLD, "Temp", startUpdate);
+    if(check != "no")
+      sensorString = sensorString + check;
 
-    diff = oldHmd-Si7020Humidity;
-    if(abs(diff) > THRESHOLD || startUpdate)
-    {
-      oldHmd = Si7020Humidity;
-      sensorString = sensorString + ", \"Humidity\":"+Si7020Humidity;
-      change = true;
-    }
+    check = getChange(Si7020Humidity, oldHmd, THRESHOLD, "Humidity", startUpdate);
+    if(check != "no")
+      sensorString = sensorString + check;
 
-    diff = oldVisible - Si1132Visible;
-    if(abs(diff) > (THRESHOLD*10) || startUpdate)
-    {
-      oldVisible = Si1132Visible;
-      sensorString = sensorString + ", \"Light\":" + Si1132Visible;
-      change = true;
-    }
+    check = getChange(Si1132Visible, oldVisible, THRES_L, "Light", startUpdate);
+    if(check != "no")
+      sensorString = sensorString + check;
 
-    double soundDiff = sound*1000 - oldSound*1000;
-    diff = lround(soundDiff);
-    if(abs(diff) > lround(THRESHOLD*46) || startUpdate)
-    {
-      oldSound = sound;
-      sensorString = sensorString + ", \"Sound\":" + sound;
-      change = true;
-    }
-
-
+    check = getChange(sound, oldSound, THRES_S, "Sound", startUpdate);
+    if(check != "no")
+      sensorString = sensorString + check;
 
     sensorString = sensorString + "}";
     //WiFi RSSI guide: >50, it's in zone 1; between 50 and 45, in zone 2; <45, in zone 3
@@ -299,9 +282,12 @@ void loop(void)
     Particle.publish("regularUpdate", sensorString, PRIVATE);
 
     if(change)
+    {
       client.post(path, (const char*) sensorString, &responseString);
+      change = false;
+    }
 
-    sensorString = sensorString+" "+(THRESHOLD*46)+" "+abs(soundDiff);
+    sensorString = sensorString+" "+ (sound);
     Particle.publish("photonSensorData",sensorString, PRIVATE);
 
     String rTime = tempStr + "" + (int)time;
@@ -310,6 +296,29 @@ void loop(void)
       regularUpdate = false;
 
     delay(500);
+}
+
+String getChange(double &current, double &old, int thres, String name, bool start)
+{
+  int diff = 0;
+  double d = 0;
+  String sensorString = "no";
+
+  if(name == "Sound")
+    d = lround((current - old)*1000);
+  else
+    d = current - old;
+
+  diff = abs(d);
+
+  if(diff > thres || start)
+  {
+    old = current;
+    change = true;
+    sensorString =  ", \"" + name + "\":"+ current;
+  }
+
+  return sensorString;
 }
 
 String getCoreID(){
