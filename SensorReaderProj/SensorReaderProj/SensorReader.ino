@@ -83,6 +83,9 @@ int inputPin = D6; // PIR motion sensor. D6 goes HIGH when motion is detected an
 
 int sensorState = LOW;        // Start by assuming no motion detected
 int sensorValue = 0;
+bool regularUpdate;
+bool sensorAttached = false;
+
 
 //// ***************************************************************************
 
@@ -130,6 +133,8 @@ void setup()
 
     // Initialize motion sensor input pin
     pinMode(inputPin, INPUT);
+
+    regularUpdate = true;
 }
 
 void initialiseMPU9150()
@@ -201,36 +206,55 @@ void loop(void)
     double sound = readSoundLevel();
     bool change = false;
     bool motionChange = false;
-    bool regularUpdate =  (time.minute() == 0 || time.minute() == 30);
+    time_t time = Time.minute();
+    bool runUpdate =  ( (int)time == 0 || (int)time == 30);
+
+    if (!runUpdate)
+      regularUpdate = true;
+
+    //regularUpdate = (runUpdate && regularUpdate);
 
     String sensorString = tempStr+"{\"CoreID\":\"" + getCoreID() + "\"";
     double diff = oldTmp-Si7020Temperature;
 
+    bool startUpdate = (runUpdate && regularUpdate);
+
 
     // THESE TWO MUST ALWAYS BE ON TOP! V
 
-    if (sensorValue == HIGH && sensorState == LOW)   // If the input pin is HIGH turn LED ON
-    {
-       sensorString =  sensorString + ", \"Motion\": 1";
-       sensorState = HIGH;                 // preserves current sensor state
-       change = true;
-    } else if (sensorValue == LOW && sensorState == HIGH) {
-        sensorString = sensorString + ", \"Motion\": 0";
-        sensorState = LOW;                   // preserves current sensor state
-        change = true;
-    }
 
-    if(regularUpdate && !change)
+    sensorValue = digitalRead(inputPin);
+
+    if(sensorValue == HIGH)
+      sensorAttached = true;
+
+    if(sensorAttached)
     {
-       if (sensorState == HIGH)
-        sensorString = sensorString + ", \"Motion\": 1";
-       else
-        sensorString = sensorString + ", \"Motion\": 0";
+      if (sensorValue == HIGH && sensorState == LOW)   // If the input pin is HIGH turn LED ON
+      {
+         sensorString =  sensorString + ", \"Motion\": 1";
+         Particle.publish("Team3Motion", "1");
+         sensorState = HIGH;                 // preserves current sensor state
+         change = true;
+      } else if (sensorValue == LOW && sensorState == HIGH) {
+          sensorString = sensorString + ", \"Motion\": 0";
+          Particle.publish("Team3Motion", "0");
+          sensorState = LOW;                   // preserves current sensor state
+          change = true;
+      }
+
+      if(startUpdate && !change)
+      {
+         if (sensorState == HIGH)
+          sensorString = sensorString + ", \"Motion\": 1";
+         else
+          sensorString = sensorString + ", \"Motion\": 0";
+      }
     }
 
     // THESE TWO MUST ALWAYS BE ON TOP! ^
 
-    if(abs(diff) > THRESHOLD || regularUpdate)
+    if(abs(diff) > THRESHOLD || startUpdate)
     {
       oldTmp = Si7020Temperature;
       sensorString = sensorString + ", \"Temp\":"+Si7020Temperature;
@@ -238,7 +262,7 @@ void loop(void)
     }
 
     diff = oldHmd-Si7020Humidity;
-    if(abs(diff) > THRESHOLD || regularUpdate)
+    if(abs(diff) > THRESHOLD || startUpdate)
     {
       oldHmd = Si7020Humidity;
       sensorString = sensorString + ", \"Humidity\":"+Si7020Humidity;
@@ -246,7 +270,7 @@ void loop(void)
     }
 
     diff = oldVisible - Si1132Visible;
-    if(abs(diff) > (THRESHOLD*10) || regularUpdate)
+    if(abs(diff) > (THRESHOLD*10) || startUpdate)
     {
       oldVisible = Si1132Visible;
       sensorString = sensorString + ", \"Light\":" + Si1132Visible;
@@ -255,7 +279,7 @@ void loop(void)
 
     double soundDiff = sound*1000 - oldSound*1000;
     diff = lround(soundDiff);
-    if(abs(diff) > lround(THRESHOLD*24) || regularUpdate)
+    if(abs(diff) > lround(THRESHOLD*24) || startUpdate)
     {
       oldSound = sound;
       sensorString = sensorString + ", \"Sound\":" + sound;
@@ -272,13 +296,19 @@ void loop(void)
 
     // || time.minute() == 0 || time.minute() == 30
 
-    if(change || regularUpdate)
+    Particle.publish("regularUpdate", sensorString, PRIVATE);
+
+    if(change)
       client.post(path, (const char*) sensorString, &responseString);
 
     sensorString = sensorString+" "+(oldVisible)+" "+Si1132Visible;
-    Particle.publish("photonSensorData",sensorString, PRIVATE);
 
-    delay(1000);
+    String rTime = tempStr + "" + (int)time;
+
+    if(startUpdate)
+      regularUpdate = false;
+
+    delay(500);
 }
 
 String getCoreID(){
