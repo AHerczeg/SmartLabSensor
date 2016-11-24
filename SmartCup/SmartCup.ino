@@ -2,6 +2,8 @@
 #include "Si1132.h"
 #include "Si70xx.h"
 #include "math.h"
+#include "rest_client.h"
+
 
 //// ***************************************************************************
 
@@ -45,11 +47,23 @@ double Si1132InfraRd = 0; //// Lux
 MPU9150 mpu9150;
 bool ACCELOK = false;
 int cx, cy, cz, ax, ay, az, gx, gy, gz;
-int oldZ = 0;
-int oldY = 0;
+float oldZ = 0;
+float oldY = 0;
 double tm; //// Celsius
 
 int maxDegree = 0;
+
+Timer sleepTimer(60000, startSleep);
+
+bool isSleeping = false;
+
+RestClient client = RestClient("sccug-330-04.lancs.ac.uk",8000);
+
+const char* path = "/Cup";
+
+String coreID;
+
+float lPercentage = 100;
 
 //// ***************************************************************************
 
@@ -67,7 +81,6 @@ void setPinsMode()
     pinMode(POWR1, INPUT);
     pinMode(POWR2, INPUT);
     pinMode(POWR3, INPUT);
-
 }
 
 void setup()
@@ -90,7 +103,12 @@ void setup()
     // initialises MPU9150 inertial measure unit
     initialiseMPU9150();
 
+    System.enableReset();
 
+    coreID = getCoreID();
+
+
+    sleepTimer.start();
 }
 
 void initialiseMPU9150()
@@ -133,14 +151,6 @@ void initialiseMPU9150()
 
 void loop(void)
 {
-    //// prints device version and address
-
-    //Serial.print("Device version: "); Serial.println(System.version());
-    //Serial.print("Device ID: "); Serial.println(System.deviceID());
-    //Serial.print("WiFi IP: "); Serial.println(WiFi.localIP());
-
-    //// ***********************************************************************
-
     //// powers up sensors
     digitalWrite(I2CEN, HIGH);
     digitalWrite(ALGEN, HIGH);
@@ -148,64 +158,41 @@ void loop(void)
     //// allows sensors time to warm up
     delay(SENSORDELAY);     //// delay timer
 
-
     //// ***********************************************************************
 
     readMPU9150();          //// reads compass, accelerometer and gyroscope data
 
+    float currentZ = abs(getZtiltX(az, ax)-180);
+    float currentY = abs(getYtiltX(ay, ax)-180);
 
-    if(abs(getYtiltX(ay, ax)-180) > maxDegree || abs(getZtiltX(az, ax)-180) > maxDegree){
-      if(abs(getZtiltX(az, ax)-180) >= abs(getYtiltX(ay, ax)-180)){
-        maxDegree = abs(getZtiltX(az, ax)-180);
-      } else {
-        maxDegree = abs(getYtiltX(ay, ax)-180);
-      }
-
-      if(maxDegree > 90){
-        maxDegree = 90;
-      }
-    }
-
-    int n = 1000;
-    float r = 5; /** radius **/
-    float L = 15; /** tank length **/
-    float h = L * sin((90 - maxDegree) *  PI / 180); /** liquid level **/
-    float slope = maxDegree *  PI / 180; /** tank slope in radians**/
-    float Vt = PI * pow(r,2) * L; /** total volume in the tank **/
-    float h0 = h / cos(slope);
-    float dh = (L/n) * tan(slope);
-    float v = 0;
-    for (int i = 0;i < n;i++){
-      if (h0 > 0) {
-        float he = h0;
-        if (h0 > r * 2)
-          he = r * 2;
-        float ve = volume(r, L/n, he);
-        v += ve;
-      }
-      h0 = h0 - dh;
-    }
-
-    int lPercentage = round((v/Vt)*100);
-
-    if(maxDegree == 90)
-      lPercentage = 0;
-
-    String sensorString = "";
-
-    if(abs(oldZ - abs(getZtiltX(az, ax)-180)) > 1 || abs(oldY - abs(getYtiltX(ay, ax)-180)) > 1){
-      oldZ = abs(getZtiltX(az, ax)-180);
-      oldY = abs(getYtiltX(ay, ax)-180);
+    if(abs(oldZ - currentZ) > 2 || abs(oldY - currentY) > 2){
+      sleepTimer.reset();
+      if(isSleeping)
+        endSleep();
+      String tempStr = "";
+      String sensorString = tempStr+"{\"CoreID\":\"" + coreID + "\"";
+      oldZ = currentZ;
+      oldY = currentY;
+      if(oldZ > 90)
+        oldZ = 90;
+      if(oldY > 90)
+        oldY = 90;
       if(oldZ >= oldY)
-        sensorString = sensorString+"Tilt: "+ oldZ + "° ";
+        sensorString = sensorString + ", \"Angle\": " + oldZ;
       else
-        sensorString = sensorString+"Tilt: "+ oldY + "° ";
+        sensorString = sensorString + ", \"Angle\": " + oldY;
 
-      sensorString = sensorString + "Max Degree: " + maxDegree + "° Liquid percantage = " + lPercentage + "%";
+      getLiquidPercentage();
+
+      sensorString = sensorString + ", \"Liquid\": " + lPercentage;
       Particle.publish("photonSensorData",sensorString, PRIVATE);
+      if(lPercentage <= 0){
+        delay(5000);
+        Sy
+      }
     }
+}
 
-  }
 
 void readMPU9150()
 {
@@ -242,7 +229,23 @@ float getZtiltX(float accelZ, float accelX)
    return tilt;
 }
 
-
+String getCoreID(){
+  String coreIdentifier = "";
+  char id[12];
+  memcpy(id, (char *)ID1, 12);
+  char hex_digit;
+  for (int i = 0; i < 12; ++i) {
+    hex_digit = 48 + (id[i] >> 4);
+    if (57 < hex_digit)
+      hex_digit += 39;
+    coreIdentifier = coreIdentifier + hex_digit;
+    hex_digit = 48 + (id[i] & 0xf);
+    if (57 < hex_digit)
+      hex_digit += 39;
+    coreIdentifier = coreIdentifier + hex_digit;
+  }
+  return coreIdentifier;
+}
 
 float volume (float r, float L, float h){
 
@@ -251,4 +254,59 @@ float volume (float r, float L, float h){
   float a = 0.5 * (r * l - c * (r - h)); /** liquid cross sectional area **/
   float volume = a * L;
   return volume;
+}
+
+
+void startSleep(){
+  sleepTimer.stop();
+  Particle.publish("photonSensorData","Sleep start", PRIVATE);
+  isSleeping = true;
+  System.sleep(1);
+}
+
+void endSleep(){
+  WiFi.on();
+  WiFi.connect();
+  Spark.connect();
+  Particle.process();
+  delay(500);
+  Particle.publish("photonSensorData","Sleep end", PRIVATE);
+  isSleeping = false;
+  sleepTimer.start();
+}
+
+float getLiquidPercentage(){
+  if(abs(getYtiltX(ay, ax)-180) > maxDegree || abs(getZtiltX(az, ax)-180) > maxDegree){
+    if(abs(getZtiltX(az, ax)-180) >= abs(getYtiltX(ay, ax)-180)){
+      maxDegree = abs(getZtiltX(az, ax)-180);
+    } else {
+      maxDegree = abs(getYtiltX(ay, ax)-180);
+    }
+
+    if(maxDegree >= 90){
+      maxDegree = 90;
+      lPercentage = 0;
+    } else {
+      int n = 100;
+      float r = 5; /** radius **/
+      float L = 15; /** tank length **/
+      float h = L * sin((90 - maxDegree) *  PI / 180); /** liquid level **/
+      float slope = maxDegree *  PI / 180; /** tank slope in radians**/
+      float Vt = PI * pow(r,2) * L; /** total volume in the tank **/
+      float h0 = h / cos(slope);
+      float dh = (L/n) * tan(slope);
+      float v = 0;
+      for (int i = 0;i < n;i++){
+        if (h0 > 0) {
+          float he = h0;
+          if (h0 > r * 2)
+            he = r * 2;
+          float ve = volume(r, L/n, he);
+          v += ve;
+        }
+        h0 = h0 - dh;
+      }
+      lPercentage = round((v/Vt)*100);
+    }
+  }
 }
