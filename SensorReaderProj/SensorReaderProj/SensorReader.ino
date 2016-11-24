@@ -88,6 +88,7 @@ int sensorValue = 0;
 bool regularUpdate;
 bool sensorAttached = false;
 
+ApplicationWatchdog watchDog(10000, System.reset);
 
 //// ***************************************************************************
 
@@ -125,7 +126,7 @@ void setup()
     Wire.begin();  // Start up I2C, required for LSM303 communication
 
     // diables interrupts
-    noInterrupts();
+    interrupts();
 
     // initialises the IO pins
     setPinsMode();
@@ -137,6 +138,8 @@ void setup()
     pinMode(inputPin, INPUT);
 
     regularUpdate = true;
+
+    System.enableReset();
 }
 
 void initialiseMPU9150()
@@ -279,7 +282,7 @@ void loop(void)
 
     // || time.minute() == 0 || time.minute() == 30
 
-    Particle.publish("regularUpdate", sensorString, PRIVATE);
+    //Particle.publish("regularUpdate", sensorString, PRIVATE);
 
     if(change)
     {
@@ -288,7 +291,7 @@ void loop(void)
     }
 
     sensorString = sensorString+" "+ (sound);
-    Particle.publish("photonSensorData",sensorString, PRIVATE);
+    //Particle.publish("photonSensorData",sensorString, PRIVATE);
 
     String rTime = tempStr + "" + (int)time;
 
@@ -296,6 +299,8 @@ void loop(void)
       regularUpdate = false;
 
     delay(500);
+
+    watchDog.checkin();
 }
 
 String getChange(double &current, double &old, int thres, String name, bool start)
