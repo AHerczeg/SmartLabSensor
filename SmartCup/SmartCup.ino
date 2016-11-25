@@ -65,6 +65,8 @@ String coreID;
 
 float lPercentage = 100;
 
+bool cupDone = false;
+
 //// ***************************************************************************
 
 //// SYSTEM_MODE(SEMI_AUTOMATIC);
@@ -164,6 +166,7 @@ void loop(void)
 
     float currentZ = abs(getZtiltX(az, ax)-180);
     float currentY = abs(getYtiltX(ay, ax)-180);
+    String responseString = "";
 
     if(abs(oldZ - currentZ) > 2 || abs(oldY - currentY) > 2){
       sleepTimer.reset();
@@ -185,10 +188,17 @@ void loop(void)
       getLiquidPercentage();
 
       sensorString = sensorString + ", \"Liquid\": " + lPercentage;
+      sensorString = sensorString + "}";
+      client.post(path, (const char*) sensorString, &responseString);
+      Particle.publish("photonSensorData",responseString, PRIVATE);
       Particle.publish("photonSensorData",sensorString, PRIVATE);
-      if(lPercentage <= 0){
-        delay(5000);
-        Sy
+      if(lPercentage <= 0 && !cupDone){
+        cupDone = true;
+        path = "/FullCup";
+        sensorString = tempStr+"{\"CoreID\":\"" + coreID + "\"}";
+        client.post(path, (const char*) sensorString, &responseString);
+        Particle.publish("photonSensorData",sensorString, PRIVATE);
+        Particle.publish("photonSensorData",responseString, PRIVATE);
       }
     }
 }
@@ -259,7 +269,8 @@ float volume (float r, float L, float h){
 
 void startSleep(){
   sleepTimer.stop();
-  Particle.publish("photonSensorData","Sleep start", PRIVATE);
+  String nameString = coreID + "Sleep start";
+  Particle.publish("photonSensorData",nameString, PRIVATE);
   isSleeping = true;
   System.sleep(1);
 }
@@ -270,9 +281,10 @@ void endSleep(){
   Spark.connect();
   Particle.process();
   delay(500);
-  Particle.publish("photonSensorData","Sleep end", PRIVATE);
+  String nameString = coreID + "Sleep end";
+  Particle.publish("photonSensorData",nameString, PRIVATE);
   isSleeping = false;
-  sleepTimer.start();
+  sleepTimer.reset();
 }
 
 float getLiquidPercentage(){
