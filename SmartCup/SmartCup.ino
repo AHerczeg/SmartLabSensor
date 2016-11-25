@@ -164,6 +164,8 @@ void loop(void)
 
     readMPU9150();          //// reads compass, accelerometer and gyroscope data
 
+    path = "/Cup";
+
     float currentZ = abs(getZtiltX(az, ax)-180);
     float currentY = abs(getYtiltX(ay, ax)-180);
     String responseString = "";
@@ -269,7 +271,7 @@ float volume (float r, float L, float h){
 
 void startSleep(){
   sleepTimer.stop();
-  String nameString = coreID + "Sleep start";
+  String nameString = coreID + " Sleep start";
   Particle.publish("photonSensorData",nameString, PRIVATE);
   isSleeping = true;
   System.sleep(1);
@@ -281,7 +283,7 @@ void endSleep(){
   Spark.connect();
   Particle.process();
   delay(500);
-  String nameString = coreID + "Sleep end";
+  String nameString = coreID + " Sleep end";
   Particle.publish("photonSensorData",nameString, PRIVATE);
   isSleeping = false;
   sleepTimer.reset();
