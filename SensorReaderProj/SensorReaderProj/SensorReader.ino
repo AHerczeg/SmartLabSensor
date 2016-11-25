@@ -88,6 +88,17 @@ int sensorValue = 0;
 bool regularUpdate;
 bool sensorAttached = false;
 
+ApplicationWatchdog watchDog(60000, System.reset);
+
+Timer sleepTimer(360000, startSleep);
+
+bool isSleeping = false;
+
+RestClient client = RestClient("sccug-330-04.lancs.ac.uk",8000);
+
+const char* path = "/Cup";
+
+String coreID;
 
 //// ***************************************************************************
 
@@ -125,7 +136,7 @@ void setup()
     Wire.begin();  // Start up I2C, required for LSM303 communication
 
     // diables interrupts
-    noInterrupts();
+    interrupts();
 
     // initialises the IO pins
     setPinsMode();
@@ -137,6 +148,12 @@ void setup()
     pinMode(inputPin, INPUT);
 
     regularUpdate = true;
+
+    System.enableReset();
+
+    coreID = getCoreID();
+
+    sleepTimer.start();
 }
 
 void initialiseMPU9150()
@@ -215,7 +232,7 @@ void loop(void)
 
     //regularUpdate = (runUpdate && regularUpdate);
 
-    String sensorString = tempStr+"{\"CoreID\":\"" + getCoreID() + "\"";
+    String sensorString = tempStr+"{\"CoreID\":\"" + coreID + "\"";
     double diff = oldTmp-Si7020Temperature;
 
     bool startUpdate = (runUpdate && regularUpdate);
@@ -256,20 +273,29 @@ void loop(void)
     // THESE TWO MUST ALWAYS BE ON TOP! ^
 
     String check = getChange(Si7020Temperature, oldTmp, THRESHOLD, "Temp", startUpdate);
-    if(check != "no")
+    if(check != "no"){
       sensorString = sensorString + check;
+      change = true;
+    }
+
 
     check = getChange(Si7020Humidity, oldHmd, THRESHOLD, "Humidity", startUpdate);
-    if(check != "no")
+    if(check != "no"){
       sensorString = sensorString + check;
+      change = true;
+    }
 
     check = getChange(Si1132Visible, oldVisible, THRES_L, "Light", startUpdate);
-    if(check != "no")
+    if(check != "no"){
       sensorString = sensorString + check;
+      change = true;
+    }
 
     check = getChange(sound, oldSound, THRES_S, "Sound", startUpdate);
-    if(check != "no")
+    if(check != "no"){
       sensorString = sensorString + check;
+      change = true;
+    }
 
     sensorString = sensorString + "}";
     //WiFi RSSI guide: >50, it's in zone 1; between 50 and 45, in zone 2; <45, in zone 3
@@ -279,16 +305,20 @@ void loop(void)
 
     // || time.minute() == 0 || time.minute() == 30
 
-    Particle.publish("regularUpdate", sensorString, PRIVATE);
+    //Particle.publish("regularUpdate", sensorString, PRIVATE);
 
     if(change)
     {
+      sleepTimer.reset();
+      if(isSleeping)
+        endSleep();
       client.post(path, (const char*) sensorString, &responseString);
       change = false;
+
     }
 
     sensorString = sensorString+" "+ (sound);
-    Particle.publish("photonSensorData",sensorString, PRIVATE);
+    //Particle.publish("photonSensorData",sensorString, PRIVATE);
 
     String rTime = tempStr + "" + (int)time;
 
@@ -296,6 +326,8 @@ void loop(void)
       regularUpdate = false;
 
     delay(500);
+
+    watchDog.checkin();
 }
 
 String getChange(double &current, double &old, int thres, String name, bool start)
@@ -394,4 +426,24 @@ float readSoundLevel()
 
     //return 1;
     return SOUNDV;
+}
+
+void startSleep(){
+  sleepTimer.stop();
+  String nameString = coreID + "Sleep start";
+  Particle.publish("photonSensorData",nameString, PRIVATE);
+  isSleeping = true;
+  System.sleep(1);
+}
+
+void endSleep(){
+  WiFi.on();
+  WiFi.connect();
+  Spark.connect();
+  Particle.process();
+  delay(500);
+  String nameString = coreID + "Sleep end";
+  Particle.publish("photonSensorData",nameString, PRIVATE);
+  isSleeping = false;
+  sleepTimer.reset();
 }
