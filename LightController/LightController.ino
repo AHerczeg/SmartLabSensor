@@ -16,7 +16,7 @@ int changeLight(String command){
   //Convert Input String in formate of "int#int#int" to 3 bytes
   int i = command.indexOf('#');
   String value = command.substring(0,i);
-  Particle.publish("Char1", value);
+  char char1 = char(value.toInt());
   int j = command.indexOf('#',i + 1);
   value = command.substring(i + 1,j);
   char char2 = char(value.toInt());
