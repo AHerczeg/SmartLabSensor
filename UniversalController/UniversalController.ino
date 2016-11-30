@@ -69,6 +69,104 @@ int last_z = 0;
 
 int maxDegree = 0;
 
+int mode = 0;
+int lastMode = 0;
+
+typedef struct {
+    int pin;
+    int delay;
+} LED_PARAM;
+
+LED_PARAM ledParams[1] = {
+    {LED, 10000}
+};
+
+Thread* ledThread;
+
+Thread* shakeThread;
+
+os_thread_return_t shakeDetect(void* param){
+  for(;;){
+
+
+    //// powers up sensors
+    digitalWrite(I2CEN, HIGH);
+    digitalWrite(ALGEN, HIGH);
+
+    //// allows sensors time to warm up
+    delay(SENSORDELAY);     //// delay timer
+
+
+
+    readMPU9150();          //// reads compass, accelerometer and gyroscope data
+
+    float speed = abs(ax + ay + az - last_x - last_y - last_z);
+
+    String tempStr = "";
+    String sensorString = "";
+    sensorString = tempStr + speed;
+    Serial.println(sensorString);
+
+    if (speed > 35000) {
+      sensorString = tempStr + "Shake at speed  " + speed;
+      Serial.println(sensorString);
+      if(mode > 2)
+        mode = 0;
+      else
+        mode++;
+      delay(1500);
+    }
+
+    last_x = ax;
+    last_y = ay;
+    last_z = az;
+  }
+}
+
+os_thread_return_t ledBlink(void* param){
+    LED_PARAM *p = (LED_PARAM*)param;
+
+    // Start never ending loop
+    for(;;){
+      switch(mode){
+        case 1: digitalWrite(LED, HIGH);
+                delay(200);
+                digitalWrite(LED, LOW);
+                delay(1000);
+                break;
+
+        case 2: digitalWrite(LED, HIGH);
+                delay(200);
+                digitalWrite(LED, LOW);
+                delay(200);
+                digitalWrite(LED, HIGH);
+                delay(200);
+                digitalWrite(LED, LOW);
+                delay(1000);
+                break;
+
+        case 3: digitalWrite(LED, HIGH);
+                delay(200);
+                digitalWrite(LED, LOW);
+                delay(200);
+                digitalWrite(LED, HIGH);
+                delay(200);
+                digitalWrite(LED, LOW);
+                delay(200);
+                digitalWrite(LED, HIGH);
+                delay(200);
+                digitalWrite(LED, LOW);
+                delay(1000);
+                break;
+
+        default: digitalWrite(LED, LOW);
+                 delay(500);
+      }
+
+    }
+
+
+}
 //// ***************************************************************************
 
 //// SYSTEM_MODE(SEMI_AUTOMATIC);
@@ -92,6 +190,9 @@ void setPinsMode()
 
     pinMode(SOILT, INPUT);
     pinMode(SOILH, INPUT);
+
+    ledThread = new Thread("led", ledBlink, &ledParams[0]);
+    shakeThread = new Thread("shake", shakeDetect);
 }
 
 void setup()
@@ -155,6 +256,7 @@ void initialiseMPU9150()
 
 void loop(void)
 {
+
     //// prints device version and address
 
     //Serial.print("Device version: "); Serial.println(System.version());
@@ -173,43 +275,15 @@ void loop(void)
     //// ***********************************************************************
 
     readMPU9150();          //// reads compass, accelerometer and gyroscope data
-    readWeatherSi7020();    //// reads pressure and altitude sensor data
-    readWeatherSi1132();    //// reads air temperaure and humidity sensor
 
+    if(lastMode != mode)
+      delay(1000);
 
-    float pitch = getXtiltY(ax, az);       //// returns device tilt along x-axis
-    float roll =  getYtiltZ(ay,az);        //// returns device tilt along y-axisg
-
-
-    float accelX = getAccelX(ax);         //// returns scaled acceleration along x axis
-    float accelY = getAccelY(ay);         //// returns scaled acceleration along y axis
-    float accelZ = getAccelZ(az);         //// returns scaled acceleration along y axis
-    float accelXYZ =  getAccelXYZ(ax, ay, az);   //returns the vector sum of the
-                                          //acceleration along x, y and z axes
+    lastMode = mode;
 
 
 
-
-    float speed = abs(ax + ay + az - last_x - last_y - last_z);
-
-    String tempStr = "";
-    String sensorString = "";
-    sensorString = tempStr + speed;
-    Serial.println(sensorString);
-
-    if (speed > 35000) {
-      sensorString = tempStr + "Shake at speed  " + speed;
-      Serial.println(sensorString);
-    }
-
-    last_x = ax;
-    last_y = ay;
-    last_z = az;
-
-
-
-
-  }
+}
 
 void readMPU9150()
 {
