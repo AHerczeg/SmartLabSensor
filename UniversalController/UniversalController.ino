@@ -2,6 +2,7 @@
 #include "Si1132.h"
 #include "Si70xx.h"
 #include "math.h"
+#include "rest_client.h"
 
 //// ***************************************************************************
 
@@ -63,14 +64,28 @@ MPU9150 mpu9150;
 bool ACCELOK = false;
 int cx, cy, cz, ax, ay, az, gx, gy, gz;
 double tm; //// Celsius
-int last_x = 0;
-int last_y = 0;
-int last_z = 0;
+int oldXSpeed = 0;
+int oldYSpeed = 0;
+int oldZSpeed = 0;
+int oldXTilt = 0;
+int oldYTilt = 0;
+
+
+bool lock = false;
 
 int maxDegree = 0;
 
 int mode = 0;
 int lastMode = 0;
+
+int colour = 1;
+int lastColour = 0;
+
+bool colourChange = false;
+
+RestClient client = RestClient("sccug-330-04.lancs.ac.uk",8000);
+
+const char* path = "/Bulb/1";
 
 typedef struct {
     int pin;
@@ -100,12 +115,12 @@ os_thread_return_t shakeDetect(void* param){
 
     readMPU9150();          //// reads compass, accelerometer and gyroscope data
 
-    float speed = abs(ax + ay + az - last_x - last_y - last_z);
+    float speed = abs(ax + ay + az - oldXSpeed - oldYSpeed - oldZSpeed);
 
     String tempStr = "";
     String sensorString = "";
     sensorString = tempStr + speed;
-    Serial.println(sensorString);
+    //Serial.println(sensorString);
 
     if (speed > 35000) {
       sensorString = tempStr + "Shake at speed  " + speed;
@@ -117,9 +132,9 @@ os_thread_return_t shakeDetect(void* param){
       delay(1500);
     }
 
-    last_x = ax;
-    last_y = ay;
-    last_z = az;
+    oldXSpeed = ax;
+    oldYSpeed = ay;
+    oldZSpeed = az;
   }
 }
 
@@ -281,7 +296,94 @@ void loop(void)
 
     lastMode = mode;
 
+    String tempStr = "";
+    String sensorString = "{\"Colour\":";
+    String responseString = "";
 
+    switch(mode){
+        // Colour
+        case 1:
+                if(colourChange){
+                  switch(colour){
+                    case 1: sensorString = tempStr + sensorString + 0 + "}";
+                            break;
+                    case 2: sensorString = tempStr + sensorString + 15 + "}";
+                            break;
+                    case 3: sensorString = tempStr + sensorString + 30 + "}";
+                            break;
+                    case 4: sensorString = tempStr + sensorString + 45 + "}";
+                            break;
+                    case 5: sensorString = tempStr + sensorString + 60 + "}";
+                            break;
+                    case 6: sensorString = tempStr + sensorString + 90 + "}";
+                            break;
+                    case 7: sensorString = tempStr + sensorString + 120 + "}";
+                            break;
+                    case 8: sensorString = tempStr + sensorString + 180 + "}";
+                            break;
+                    case 9: sensorString = tempStr + sensorString + 240 + "}";
+                            break;
+                    case 10: sensorString = tempStr + sensorString + 270 + "}";
+                            break;
+                    case 11: sensorString = tempStr + sensorString + 310 + "}";
+                            break;
+                    case 12: sensorString = tempStr + sensorString + 345 + "}";
+                            break;
+                  }
+                  if(lastColour != colour){
+                    Serial.println(sensorString);
+                    client.post(path, (const char*) sensorString, &responseString);
+                    Serial.println(responseString);
+                  }
+                  lastColour = colour;
+                }
+                break;
+        // Brightness
+        case 2:
+                break;
+
+        // Kettle
+        case 3:
+                break;
+    }
+
+    int currentX = (int)getXtiltY(ax, ay);
+    int currentZ = abs(getZtiltX(az, ax)-180);
+
+
+    if(currentZ < 30 && !colourChange && !lock){
+      colourChange = true;
+      colour++;
+      if(colour > 12)
+        colour = 1;
+      Serial.println("colourChange: true");
+    } else if (currentZ > 70 && colourChange){
+      colourChange = false;
+      Serial.println("colourChange: false");
+    }
+
+
+    if(gx < -1000 || gx > 3000){
+      if((currentX > 320 || currentX < 10) && !lock){
+        Serial.println("Lock");
+        lock = true;
+        delay(1000);
+      } else if ((currentX > 160 && currentX < 190) && lock){
+        Serial.println("Unlock");
+        lock = false;
+        delay(1000);
+      }
+    }
+
+
+
+
+    String tilts = tempStr + "XtiltY: " + getXtiltY(ax, ay) + "   gx: " + gx;
+    //Serial.println(tilts);
+
+    oldXTilt = currentX;
+
+    delay(500);
 
 }
 
@@ -305,37 +407,6 @@ void readMPU9150()
 }
 
 
-//// returns air temperature and humidity
-int readWeatherSi7020()
-{
-    Si70xx si7020;
-    Si7020OK = si7020.begin(); //// initialises Si7020
-
-    if (Si7020OK)
-    {
-        Si7020Temperature = si7020.readTemperature();
-        Si7020Humidity = si7020.readHumidity();
-    }
-
-    return Si7020OK ? 2 : 0;
-}
-
-
-//// returns measurements of UV, InfraRed and Ambient light
-int readWeatherSi1132()
-{
-    Si1132 si1132;
-    Si1132OK = si1132.begin(); //// initialises Si1132
-
-    if (Si1132OK)
-    {
-        Si1132UVIndex = si1132.readUV() / 100;
-        Si1132Visible = si1132.readVisible();  ////0 to 1000 Lux
-        Si1132InfraRd = si1132.readIR();
-    }
-
-    return Si1132OK ? 3 : 0;
-}
 
 //// returns accelaration along x-axis, should be 0-1g
 float getAccelX(float x)
@@ -436,35 +507,4 @@ float getZtiltX(float accelZ, float accelX)
    }
 
    return tilt;
-}
-
-//returns sound level measurement in as voltage values (0 to 3.3v)
-float readSoundLevel()
-{
-    unsigned int sampleWindow = 50; // Sample window width in milliseconds (50 milliseconds = 20Hz)
-    unsigned long endWindow = millis() + sampleWindow;  // End of sample window
-
-    unsigned int signalSample = 0;
-    unsigned int signalMin = 4095; // Minimum is the lowest signal below which we assume silence
-    unsigned int signalMax = 0; // Maximum signal starts out the same as the Minimum signal
-
-    // collect data for milliseconds equal to sampleWindow
-    while (millis() < endWindow)
-    {
-        signalSample = analogRead(SOUND);
-        if (signalSample > signalMax)
-        {
-            signalMax = signalSample;  // save just the max levels
-        }
-        else if (signalSample < signalMin)
-        {
-            signalMin = signalSample;  // save just the min levels
-        }
-    }
-
-    //SOUNDV = signalMax - signalMin;  // max - min = peak-peak amplitude
-    SOUNDV = mapFloat((signalMax - signalMin), 0, 4095, 0, 3.3);
-
-    //return 1;
-    return SOUNDV;
 }
