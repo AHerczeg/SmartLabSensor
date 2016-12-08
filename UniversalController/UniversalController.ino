@@ -122,14 +122,31 @@ os_thread_return_t shakeDetect(void* param){
     sensorString = tempStr + speed;
     //Serial.println(sensorString);
 
-    if (speed > 35000) {
-      sensorString = tempStr + "Shake at speed  " + speed;
-      Serial.println(sensorString);
-      if(mode > 2)
-        mode = 0;
-      else
-        mode++;
-      delay(1500);
+    if(!lock){
+      if (speed > 35000) {
+        sensorString = tempStr + "Shake at speed  " + speed;
+        Serial.println(sensorString);
+        if(mode > 2)
+          mode = 0;
+        else
+          mode++;
+        delay(1500);
+      }
+
+      if(gx < -1000 || gx > 3000){
+        if(currentX > 320 || currentX < 10){
+          Serial.println("Lock");
+          lock = true;
+          delay(1000);
+        }
+      }
+
+    } else if(lock) {
+      if (currentX > 160 && currentX < 190){
+       Serial.println("Unlock");
+       lock = false;
+       delay(1000);
+     }
     }
 
     oldXSpeed = ax;
@@ -361,20 +378,6 @@ void loop(void)
       colourChange = false;
       Serial.println("colourChange: false");
     }
-
-
-    if(gx < -1000 || gx > 3000){
-      if((currentX > 320 || currentX < 10) && !lock){
-        Serial.println("Lock");
-        lock = true;
-        delay(1000);
-      } else if ((currentX > 160 && currentX < 190) && lock){
-        Serial.println("Unlock");
-        lock = false;
-        delay(1000);
-      }
-    }
-
 
 
 
