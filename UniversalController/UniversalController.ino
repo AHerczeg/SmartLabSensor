@@ -91,16 +91,6 @@ bool colourChange = false;
 
 bool angleChange = false;
 
-unsigned long totalTime = 0;
-
-int totalBattery = 0;
-
-int loopCounter = 0;
-
-Timer sleepTimer(60000, startSleep);
-
-bool isSleeping = false;
-
 RestClient client = RestClient("sccug-330-04.lancs.ac.uk",8000);
 
 const char* path = "/Bulb/2/1";
@@ -144,9 +134,6 @@ os_thread_return_t shakeDetect(void* param){
 
     if(lock){
       if (speed > 35000) {
-        sleepTimer.reset();
-        if(isSleeping)
-          endSleep();
         sensorString = tempStr + "Shake at speed  " + speed;
         Serial.println(sensorString);
         if(mode > 2)
@@ -156,23 +143,15 @@ os_thread_return_t shakeDetect(void* param){
         delay(1500);
       }
 
-      if(gx < -1000 || gx > 3000){
-        if (currentX > 160 && currentX < 190){
-          sleepTimer.reset();
-          if(isSleeping)
-            endSleep();
-          Serial.println("Unlock");
-          lock = false;
-          delay(2000);
-        }
+      if (currentX > 160 && currentX < 190){
+       Serial.println("Unlock");
+       lock = false;
+       delay(2000);
       }
 
     } else {
       if(gx < -1000 || gx > 3000){
         if(currentX > 320 || currentX < 10){
-          sleepTimer.reset();
-          if(isSleeping)
-            endSleep();
           Serial.println("Lock");
           lock = true;
           delay(2000);
@@ -327,9 +306,6 @@ void loop(void)
     //Serial.print("WiFi IP: "); Serial.println(WiFi.localIP());
 
     //// ***********************************************************************
-
-
-    unsigned long start = millis();
 
     //// powers up sensors
     digitalWrite(I2CEN, HIGH);
@@ -496,28 +472,18 @@ void loop(void)
                 break;
     }
 
-    //String tilts = tempStr + "XtiltY: " + getXtiltY(ax, ay) + "   gx: " + gx;
+
+
+
+
+
+
+
+
+    String tilts = tempStr + "XtiltY: " + getXtiltY(ax, ay) + "   gx: " + gx;
     //Serial.println(tilts);
 
     //oldXTilt = currentX;
-
-    unsigned long end = millis();
-
-    if(end-start > 0){
-        totalTime += (end-start);
-        if(!isSleeping){
-          totalBattery += ((end-start) * 18);
-        } else {
-          totalBattery += ((end-start) * 2);
-        }
-        loopCounter++;
-    }
-
-    String averageTime = tempStr + "Average runtime: " + (totalTime/loopCounter) + "ms";
-    Serial.println(averageTime);
-
-    String averageBattery = tempStr + "Average battery usage: " + ((totalBattery * 3.3)/loopCounter) + "Watts";
-    Serial.println(averageTime);
 
     delay(500);
 
@@ -643,20 +609,4 @@ float getZtiltX(float accelZ, float accelX)
    }
 
    return tilt;
-}
-
-void startSleep(){
-  sleepTimer.stop();
-  isSleeping = true;
-  System.sleep(1);
-}
-
-void endSleep(){
-  WiFi.on();
-  WiFi.connect();
-  Spark.connect();
-  Particle.process();
-  delay(500);
-  isSleeping = false;
-  sleepTimer.reset();
 }
