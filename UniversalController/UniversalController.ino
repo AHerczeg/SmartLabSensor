@@ -401,6 +401,9 @@ void loop(void)
                             break;
                   }
                   if(lastColour != colour){
+                    sleepTimer.reset();
+                    if(isSleeping)
+                      endSleep();
                     Serial.println(sensorString);
                     client.post(path, (const char*) sensorString, &responseString);
                     Serial.println(responseString);
@@ -427,6 +430,9 @@ void loop(void)
                   angleChange = false;
                 }
                 if(brightness != lastBrightness){
+                  sleepTimer.reset();
+                  if(isSleeping)
+                    endSleep();
                   sensorString = tempStr + sensorString + brightness + "}";
                   Serial.println(sensorString);
                   client.post(path, (const char*) sensorString, &responseString);
@@ -454,21 +460,24 @@ void loop(void)
                   angleChange = false;
                 }
                 if(currentZone != lastZone){
+                  sleepTimer.reset();
+                  if(isSleeping)
+                    endSleep();
                   path = tempStr + "/Bulb/" + currentZone + "/1";
-                  sensorString = tempStr + sensorString + "100}";
+                  sensorString = tempStr + "{\"Brightness\":100}";
                   client.post(path, (const char*) sensorString, &responseString);
-                  sensorString = tempStr + sensorString + "0}";
+                  sensorString = tempStr + "{\"Brightness\":0}";
                   client.post(path, (const char*) sensorString, &responseString);
-                  sensorString = tempStr + sensorString + "100}";
+                  sensorString = tempStr + "{\"Brightness\":100}";
                   client.post(path, (const char*) sensorString, &responseString);
                   Serial.println(sensorString);
-                  client.post(path, (const char*) sensorString, &responseString);
                   Serial.println(responseString);
                 }
                 break;
         // Kettle
         case 4:
-                path = tempStr + "/Kettle/";
+                /*
+                path = tempStr + "/Kettle";
                 if(currentZ < 30 && !lock && !angleChange){
                   angleChange = true;
                   currentKettle = true;
@@ -481,6 +490,9 @@ void loop(void)
                   angleChange = false;
                 }
                 if(currentKettle != lastKettle){
+                  sleepTimer.reset();
+                  if(isSleeping)
+                    endSleep();
                   if(currentKettle){
                     sensorString = tempStr + sensorString + "1}";
                     Serial.println(sensorString);
@@ -493,6 +505,7 @@ void loop(void)
                     Serial.println(responseString);
                   }
                 }
+                */
                 break;
     }
 
@@ -517,7 +530,7 @@ void loop(void)
     Serial.println(averageTime);
 
     String averageBattery = tempStr + "Average battery usage: " + ((totalBattery * 3.3)/loopCounter) + "Watts";
-    Serial.println(averageTime);
+    Serial.println(averageBattery);
 
     delay(500);
 
