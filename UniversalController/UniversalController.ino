@@ -404,6 +404,7 @@ void loop(void)
                     sleepTimer.reset();
                     if(isSleeping)
                       endSleep();
+                    lastColour = colour;
                     Serial.println(sensorString);
                     client.post(path, (const char*) sensorString, &responseString);
                     Serial.println(responseString);
@@ -433,6 +434,7 @@ void loop(void)
                   sleepTimer.reset();
                   if(isSleeping)
                     endSleep();
+                  lastBrightness = brightness;
                   sensorString = tempStr + sensorString + brightness + "}";
                   Serial.println(sensorString);
                   client.post(path, (const char*) sensorString, &responseString);
@@ -463,14 +465,25 @@ void loop(void)
                   sleepTimer.reset();
                   if(isSleeping)
                     endSleep();
-                  path = tempStr + "/Bulb/" + currentZone + "/1";
+                  lastZone = currentZone;
+                  tempStr = "";
+                  switch(currentZone){
+                    case 0: path = "/Bulb/0/1";
+                            break;
+                    case 1: path = "/Bulb/1/1";
+                            break;
+                    case 2: path = "/Bulb/2/1";
+                            break;
+                    case 3: path = "/Bulb/3/1";
+                            break;
+                  }
                   sensorString = tempStr + "{\"Brightness\":100}";
                   client.post(path, (const char*) sensorString, &responseString);
                   sensorString = tempStr + "{\"Brightness\":0}";
                   client.post(path, (const char*) sensorString, &responseString);
                   sensorString = tempStr + "{\"Brightness\":100}";
                   client.post(path, (const char*) sensorString, &responseString);
-                  Serial.println(sensorString);
+                  Serial.println(path);
                   Serial.println(responseString);
                 }
                 break;
