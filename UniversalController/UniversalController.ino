@@ -71,7 +71,7 @@ int oldXTilt = 0;
 int oldYTilt = 0;
 
 
-bool lock = false;
+bool lock = true;
 
 int maxDegree = 0;
 
@@ -81,11 +81,17 @@ int lastMode = 0;
 int colour = 1;
 int lastColour = 0;
 
+int lastBrightness = 0;
+
+int lastZone = 2;
+
 bool colourChange = false;
+
+bool angleChange = false;
 
 RestClient client = RestClient("sccug-330-04.lancs.ac.uk",8000);
 
-const char* path = "/Bulb/1";
+const char* path = "/Bulb/2/1";
 
 typedef struct {
     int pin;
@@ -122,7 +128,9 @@ os_thread_return_t shakeDetect(void* param){
     sensorString = tempStr + speed;
     //Serial.println(sensorString);
 
-    if(!lock){
+    int currentX = (int)getXtiltY(ax, ay);
+
+    if(lock){
       if (speed > 35000) {
         sensorString = tempStr + "Shake at speed  " + speed;
         Serial.println(sensorString);
@@ -133,20 +141,20 @@ os_thread_return_t shakeDetect(void* param){
         delay(1500);
       }
 
+      if (currentX > 160 && currentX < 190){
+       Serial.println("Unlock");
+       lock = false;
+       delay(2000);
+      }
+
+    } else {
       if(gx < -1000 || gx > 3000){
         if(currentX > 320 || currentX < 10){
           Serial.println("Lock");
           lock = true;
-          delay(1000);
+          delay(2000);
         }
       }
-
-    } else if(lock) {
-      if (currentX > 160 && currentX < 190){
-       Serial.println("Unlock");
-       lock = false;
-       delay(1000);
-     }
     }
 
     oldXSpeed = ax;
@@ -314,12 +322,29 @@ void loop(void)
     lastMode = mode;
 
     String tempStr = "";
-    String sensorString = "{\"Colour\":";
+    String sensorString;
     String responseString = "";
+
+    int brightness = lastBrightness;
+
+    int currentZone = lastZone;
+
+    int currentZ = abs(getZtiltX(az, ax)-180);
 
     switch(mode){
         // Colour
         case 1:
+                sensorString = "{\"Colour\":";
+                if(currentZ < 30 && !colourChange && !lock){
+                  colourChange = true;
+                  colour++;
+                  if(colour > 12)
+                    colour = 1;
+                  //Serial.println("colourChange: true");
+                } else if (currentZ > 70 && colourChange){
+                  colourChange = false;
+                  //Serial.println("colourChange: false");
+                }
                 if(colourChange){
                   switch(colour){
                     case 1: sensorString = tempStr + sensorString + 0 + "}";
@@ -357,34 +382,76 @@ void loop(void)
                 break;
         // Brightness
         case 2:
+                sensorString = "{\"Brightness\":";
+                if(currentZ < 30 && !lock && !angleChange){
+                  angleChange = true;
+                  brightness += 25;
+                  if(brightness > 100)
+                    brightness = 100;
+                  Serial.println("Brightness UP");
+                } else if (currentZ > 120 && !lock && !angleChange){
+                  angleChange = true;
+                  brightness -= 25;
+                  if(brightness < 0)
+                    brightness = 0;
+                  Serial.println("Brightness DOWN");
+                } else if (currentZ > 70 && currentZ < 100 && !lock && angleChange){
+                  angleChange = false;
+                }
+                if(brightness != lastBrightness){
+                  sensorString = tempStr + sensorString + brightness + "}";
+                  Serial.println(sensorString);
+                  client.post(path, (const char*) sensorString, &responseString);
+                  Serial.println(responseString);
+                }
+
                 break;
 
         // Kettle
         case 3:
+
+                if(currentZ < 30 && !lock && !angleChange){
+                  angleChange = true;
+                  currentZone++;
+                  if(currentZone > 3)
+                    currentZone = 0;
+                  Serial.println("Zone UP");
+                } else if (currentZ > 120 && !lock && !angleChange){
+                  angleChange = true;
+                  currentZone--;
+                  if(currentZone < 0)
+                    currentZone = 3;
+                  Serial.println("Zone DOWN");
+                } else if (currentZ > 70 && currentZ < 100 && !lock && angleChange){
+                  angleChange = false;
+                }
+                if(currentZone != lastZone){
+                  path = tempStr + "/Bulb/" + currentZone + "/1";
+                  sensorString = tempStr + sensorString + "100}";
+                  client.post(path, (const char*) sensorString, &responseString);
+                  sensorString = tempStr + sensorString + "0}";
+                  client.post(path, (const char*) sensorString, &responseString);
+                  sensorString = tempStr + sensorString + "100}";
+                  client.post(path, (const char*) sensorString, &responseString);
+                  Serial.println(sensorString);
+                  client.post(path, (const char*) sensorString, &responseString);
+                  Serial.println(responseString);
+                }
                 break;
     }
 
-    int currentX = (int)getXtiltY(ax, ay);
-    int currentZ = abs(getZtiltX(az, ax)-180);
 
 
-    if(currentZ < 30 && !colourChange && !lock){
-      colourChange = true;
-      colour++;
-      if(colour > 12)
-        colour = 1;
-      Serial.println("colourChange: true");
-    } else if (currentZ > 70 && colourChange){
-      colourChange = false;
-      Serial.println("colourChange: false");
-    }
+
+
+
 
 
 
     String tilts = tempStr + "XtiltY: " + getXtiltY(ax, ay) + "   gx: " + gx;
     //Serial.println(tilts);
 
-    oldXTilt = currentX;
+    //oldXTilt = currentX;
 
     delay(500);
 
