@@ -85,6 +85,8 @@ int lastBrightness = 0;
 
 int lastZone = 2;
 
+bool lastKettle = false;
+
 bool colourChange = false;
 
 bool angleChange = false;
@@ -329,6 +331,8 @@ void loop(void)
 
     int currentZone = lastZone;
 
+    bool currentKettle = lastKettle;
+
     int currentZ = abs(getZtiltX(az, ax)-180);
 
     switch(mode){
@@ -407,7 +411,7 @@ void loop(void)
 
                 break;
 
-        // Kettle
+        // Zone
         case 3:
 
                 if(currentZ < 30 && !lock && !angleChange){
@@ -436,6 +440,34 @@ void loop(void)
                   Serial.println(sensorString);
                   client.post(path, (const char*) sensorString, &responseString);
                   Serial.println(responseString);
+                }
+                break;
+        // Kettle
+        case 4:
+                path = tempStr + "/Kettle/";
+                if(currentZ < 30 && !lock && !angleChange){
+                  angleChange = true;
+                  currentKettle = true;
+                  Serial.println("Kettle ON");
+                } else if (currentZ > 120 && !lock && !angleChange){
+                  angleChange = true;
+                  currentKettle = false;
+                  Serial.println("Kettle OFF");
+                } else if (currentZ > 70 && currentZ < 100 && !lock && angleChange){
+                  angleChange = false;
+                }
+                if(currentKettle != lastKettle){
+                  if(currentKettle){
+                    sensorString = tempStr + sensorString + "1}";
+                    Serial.println(sensorString);
+                    client.post(path, (const char*) sensorString, &responseString);
+                    Serial.println(responseString);
+                  } else {
+                    sensorString = tempStr + sensorString + "0}";
+                    Serial.println(sensorString);
+                    client.post(path, (const char*) sensorString, &responseString);
+                    Serial.println(responseString);
+                  }
                 }
                 break;
     }
