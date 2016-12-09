@@ -196,7 +196,7 @@ void loop(void)
       Particle.publish("photonSensorData",sensorString, PRIVATE);
       if(lPercentage <= 0 && !cupDone){
         cupDone = true;
-        path = "/FullCup";
+        path = "/FullCups";
         sensorString = tempStr+"{\"CoreID\":\"" + coreID + "\"}";
         client.post(path, (const char*) sensorString, &responseString);
         Particle.publish("photonSensorData",sensorString, PRIVATE);
