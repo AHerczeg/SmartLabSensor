@@ -85,6 +85,11 @@ int limit_2 = 45;
 
 Si1132 si1132 = Si1132();
 
+
+RestClient client = RestClient("sccug-330-04.lancs.ac.uk",8000);
+
+const char* path = "/LocTracking";
+
 //// ***************************************************************************
 
 
@@ -190,53 +195,11 @@ void loop(void)
 
     //// ***********************************************************************
 
-    readWeatherSi7020();
-    readSi1132Sensor();
-
-
-    RestClient client = RestClient("sccug-330-04.lancs.ac.uk",8000);
-
-    const char* path = "/LocTracking";
 
     String tempStr = "";
-    double sound = readSoundLevel();
+    String sensorString = tempStr+"{\"CoreID\":\"" + getCoreID() + "\"";
     bool change = false;
 
-    String sensorString = tempStr+"{\"CoreID\":\"" + getCoreID() + "\"";
-    double diff = oldTmp-Si7020Temperature;
-/**
-    if(abs(diff) > THRESHOLD)
-    {
-      oldTmp = Si7020Temperature;
-      sensorString = sensorString + ", \"Temp\":"+Si7020Temperature;
-      change = true;
-    }
-
-    diff = oldHmd-Si7020Humidity;
-    if(abs(diff) > THRESHOLD)
-    {
-      oldHmd = Si7020Humidity;
-      sensorString = sensorString + ", \"Humidity\":"+Si7020Humidity;
-      change = true;
-    }
-
-    diff = oldVisible - Si1132Visible;
-    if(abs(diff) > (THRESHOLD*10))
-    {
-      oldVisible = Si1132Visible;
-      sensorString = sensorString + ", \"Light\":" + Si1132Visible;
-      change = true;
-    }
-
-    double soundDiff = sound*1000 - oldSound*1000;
-    diff = lround(soundDiff);
-    if(abs(diff) > lround(THRESHOLD*24))
-    {
-      oldSound = sound;
-      sensorString = sensorString + ", \"Sound\":" + sound;
-      change = true;
-    }
-**/    
     int reading = -(WiFi.RSSI()); //RSSI value is negative, this makes comparisons more readable
     int f = 0;
 
@@ -279,7 +242,7 @@ void loop(void)
     sensorString = sensorString+" "+oldPos+" "+f+" "+reading+" "+limit_3;
     Particle.publish("photonSensorData",sensorString, PRIVATE);
 
-    delay(1000);
+    delay(500);
 }
 
 void updateLimit3(const char *event, const char *data)
@@ -312,61 +275,4 @@ String getCoreID(){
     coreIdentifier = coreIdentifier + hex_digit;
   }
   return coreIdentifier;
-}
-
-
-int readWeatherSi7020()
-{
-    Si70xx si7020;
-    Si7020OK = si7020.begin(); //// initialises Si7020
-
-    if (Si7020OK)
-    {
-        Si7020Temperature = si7020.readTemperature();
-        Si7020Humidity = si7020.readHumidity();
-    }
-
-    return Si7020OK ? 2 : 0;
-}
-
-
-
-///reads UV, visible and InfraRed light level
-void readSi1132Sensor()
-{
-    si1132.begin(); //// initialises Si1132
-    Si1132UVIndex = si1132.readUV() *0.01;
-    Si1132Visible = si1132.readVisible();
-    Si1132InfraRed = si1132.readIR();
-}
-
-//returns sound level measurement in as voltage values (0 to 3.3v)
-float readSoundLevel()
-{
-    unsigned int sampleWindow = 50; // Sample window width in milliseconds (50 milliseconds = 20Hz)
-    unsigned long endWindow = millis() + sampleWindow;  // End of sample window
-
-    unsigned int signalSample = 0;
-    unsigned int signalMin = 4095; // Minimum is the lowest signal below which we assume silence
-    unsigned int signalMax = 0; // Maximum signal starts out the same as the Minimum signal
-
-    // collect data for milliseconds equal to sampleWindow
-    while (millis() < endWindow)
-    {
-        signalSample = analogRead(SOUND);
-        if (signalSample > signalMax)
-        {
-            signalMax = signalSample;  // save just the max levels
-        }
-        else if (signalSample < signalMin)
-        {
-            signalMin = signalSample;  // save just the min levels
-        }
-    }
-
-    //SOUNDV = signalMax - signalMin;  // max - min = peak-peak amplitude
-    SOUNDV = mapFloat((signalMax - signalMin), 0, 4095, 0, 3.3);
-
-    //return 1;
-    return SOUNDV;
 }
