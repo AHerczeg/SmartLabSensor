@@ -489,7 +489,6 @@ void loop(void)
                 break;
         // Kettle
         case 4:
-                /*
                 path = tempStr + "/Kettle";
                 if(currentZ < 30 && !lock && !angleChange){
                   angleChange = true;
@@ -518,7 +517,6 @@ void loop(void)
                     Serial.println(responseString);
                   }
                 }
-                */
                 break;
     }
 

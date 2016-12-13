@@ -90,6 +90,12 @@ RestClient client = RestClient("sccug-330-04.lancs.ac.uk",8000);
 
 const char* path = "/LocTracking";
 
+unsigned long totalTime = 0;
+
+int totalBattery = 0;
+
+int loopCounter = 0;
+
 //// ***************************************************************************
 
 
@@ -195,6 +201,7 @@ void loop(void)
 
     //// ***********************************************************************
 
+    unsigned long start = millis();
 
     String tempStr = "";
     String sensorString = tempStr+"{\"CoreID\":\"" + getCoreID() + "\"";
@@ -230,38 +237,45 @@ void loop(void)
         oldPos = pos;
         change = true;
       }
-      String posString = tempStr + "Pos: " + pos;
-      Serial.println(posString);
     }
     sensorString = sensorString + "}";
 
     //Serial.println(sensorString);
     String responseString = "";
 
-    String rssiString = tempStr + "RSSI: " + reading;
-    Serial.println(rssiString);
-
     if(change)
+      Serial.println("Change");
       //client.post(path, (const char*) sensorString, &responseString);
 
-    sensorString = sensorString+" "+oldPos+" "+f+" "+reading+" "+limit_3;
-    //Particle.publish("photonSensorData",sensorString, PRIVATE);
+    if(end-start > 0){
+        totalTime += (end-start);
+        if(!isSleeping){
+          totalBattery += ((end-start) * 18);
+        } else {
+          totalBattery += ((end-start) * 2);
+        }
+        loopCounter++;
+    }
 
-    delay(500);
+    String averageTime = tempStr + "Average runtime: " + (totalTime/loopCounter) + "ms";
+    Serial.println(averageTime);
+
+    String averageBattery = tempStr + "Average battery usage: " + ((totalBattery * 3.3)/loopCounter) + "Watts";
+    Serial.println(averageBattery);
 }
 
 void updateLimit3(const char *event, const char *data)
 {
   String s = String(data);
   limit_3 = -(s.toInt());
-  limit_2 = limit_3 - 5;
+  //limit_2 = limit_3 - 5;
 }
 
 void updateLimit2(const char *event, const char *data)
 {
   String s = String(data);
   limit_2 = s.toInt();
-  limit_3 = limit_2 + 5; // Limit 2 and 3 are 5 units apart
+  //limit_3 = limit_2 + 5; // Limit 2 and 3 are 5 units apart
 }
 
 String getCoreID(){
