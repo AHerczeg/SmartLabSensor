@@ -230,17 +230,22 @@ void loop(void)
         oldPos = pos;
         change = true;
       }
+      String posString = tempStr + "Pos: " + pos;
+      Serial.println(posString);
     }
     sensorString = sensorString + "}";
 
-    Serial.println(sensorString);
+    //Serial.println(sensorString);
     String responseString = "";
 
+    String rssiString = tempStr + "RSSI: " + reading;
+    Serial.println(rssiString);
+
     if(change)
-      client.post(path, (const char*) sensorString, &responseString);
+      //client.post(path, (const char*) sensorString, &responseString);
 
     sensorString = sensorString+" "+oldPos+" "+f+" "+reading+" "+limit_3;
-    Particle.publish("photonSensorData",sensorString, PRIVATE);
+    //Particle.publish("photonSensorData",sensorString, PRIVATE);
 
     delay(500);
 }
