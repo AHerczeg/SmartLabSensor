@@ -248,8 +248,7 @@ void loop(void)
     String responseString = "";
 
     if(change)
-      Serial.println("Change");
-      //client.post(path, (const char*) sensorString, &responseString);
+      client.post(path, (const char*) sensorString, &responseString);
 
       unsigned long end = millis();
 
