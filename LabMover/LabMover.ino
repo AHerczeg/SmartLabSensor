@@ -96,6 +96,10 @@ int totalBattery = 0;
 
 int loopCounter = 0;
 
+Timer sleepTimer(60000, startSleep);
+
+bool isSleeping = false;
+
 //// ***************************************************************************
 
 
@@ -247,6 +251,8 @@ void loop(void)
       Serial.println("Change");
       //client.post(path, (const char*) sensorString, &responseString);
 
+      unsigned long end = millis();
+
     if(end-start > 0){
         totalTime += (end-start);
         if(!isSleeping){
@@ -262,6 +268,8 @@ void loop(void)
 
     String averageBattery = tempStr + "Average battery usage: " + ((totalBattery * 3.3)/loopCounter) + "Watts";
     Serial.println(averageBattery);
+
+    sleepTimer.reset();
 }
 
 void updateLimit3(const char *event, const char *data)
@@ -294,4 +302,21 @@ String getCoreID(){
     coreIdentifier = coreIdentifier + hex_digit;
   }
   return coreIdentifier;
+}
+
+
+void startSleep(){
+  sleepTimer.stop();
+  isSleeping = true;
+  System.sleep(1);
+}
+
+void endSleep(){
+  WiFi.on();
+  WiFi.connect();
+  Spark.connect();
+  Particle.process();
+  delay(500);
+  isSleeping = false;
+  sleepTimer.reset();
 }
