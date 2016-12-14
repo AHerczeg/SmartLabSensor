@@ -248,7 +248,7 @@ void loop(void)
     String responseString = "";
 
     if(change)
-      client.post(path, (const char*) sensorString, &responseString);
+      client.post(path, (const char*) sensorString);
 
       unsigned long end = millis();
 
