@@ -377,8 +377,30 @@ void loop(void)
     int currentZ = abs(getZtiltX(az, ax)-180);
 
     switch(mode){
-        // Colour
-        case 1:
+      //Zone
+      case 1:
+
+              if(currentZ < 30 && !lock && !angleChange){
+                angleChange = true;
+                currentZone++;
+                if(currentZone > 3)
+                  currentZone = 0;
+                Serial.println("Zone UP");
+              } else if (currentZ > 120 && !lock && !angleChange){
+                angleChange = true;
+                currentZone--;
+                if(currentZone < 0)
+                  currentZone = 3;
+                Serial.println("Zone DOWN");
+              } else if (currentZ > 70 && currentZ < 100 && !lock && angleChange){
+                angleChange = false;
+              }
+              if(currentZone != lastZone){
+                sleepTimer.reset();
+                if(isSleeping)
+                  endSleep();
+                lastZone = currentZone;
+                tempStr = "";
                 switch(currentZone){
                   case 0: path = "/Bulb/0/1";
                           break;
@@ -389,6 +411,18 @@ void loop(void)
                   case 3: path = "/Bulb/3/1";
                           break;
                 }
+                sensorString = tempStr + "{\"Brightness\":100}";
+                client.post(path, (const char*) sensorString, &responseString);
+                sensorString = tempStr + "{\"Brightness\":0}";
+                client.post(path, (const char*) sensorString, &responseString);
+                sensorString = tempStr + "{\"Brightness\":100}";
+                client.post(path, (const char*) sensorString, &responseString);
+                Serial.println(path);
+                Serial.println(responseString);
+              }
+              break;
+        // Colour
+        case 2:
                 sensorString = "{\"Colour\":";
                 if(currentZ < 30 && !colourChange && !lock){
                   colourChange = true;
@@ -440,7 +474,7 @@ void loop(void)
                 }
                 break;
         // Brightness
-        case 2:
+        case 3:
                 sensorString = "{\"Brightness\":";
                 if(currentZ < 30 && !lock && !angleChange){
                   angleChange = true;
@@ -468,51 +502,6 @@ void loop(void)
                   Serial.println(responseString);
                 }
 
-                break;
-
-        // Zone
-        case 3:
-
-                if(currentZ < 30 && !lock && !angleChange){
-                  angleChange = true;
-                  currentZone++;
-                  if(currentZone > 3)
-                    currentZone = 0;
-                  Serial.println("Zone UP");
-                } else if (currentZ > 120 && !lock && !angleChange){
-                  angleChange = true;
-                  currentZone--;
-                  if(currentZone < 0)
-                    currentZone = 3;
-                  Serial.println("Zone DOWN");
-                } else if (currentZ > 70 && currentZ < 100 && !lock && angleChange){
-                  angleChange = false;
-                }
-                if(currentZone != lastZone){
-                  sleepTimer.reset();
-                  if(isSleeping)
-                    endSleep();
-                  lastZone = currentZone;
-                  tempStr = "";
-                  switch(currentZone){
-                    case 0: path = "/Bulb/0/1";
-                            break;
-                    case 1: path = "/Bulb/1/1";
-                            break;
-                    case 2: path = "/Bulb/2/1";
-                            break;
-                    case 3: path = "/Bulb/3/1";
-                            break;
-                  }
-                  sensorString = tempStr + "{\"Brightness\":100}";
-                  client.post(path, (const char*) sensorString, &responseString);
-                  sensorString = tempStr + "{\"Brightness\":0}";
-                  client.post(path, (const char*) sensorString, &responseString);
-                  sensorString = tempStr + "{\"Brightness\":100}";
-                  client.post(path, (const char*) sensorString, &responseString);
-                  Serial.println(path);
-                  Serial.println(responseString);
-                }
                 break;
         // Kettle
         case 4:
