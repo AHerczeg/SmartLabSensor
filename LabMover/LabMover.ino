@@ -214,6 +214,8 @@ void loop(void)
     int reading = -(WiFi.RSSI()); //RSSI value is negative, this makes comparisons more readable
     int f = 0;
 
+    Serial.println(reading);
+
     if(reading > 0) // WiFi.RSSI returns positive values as error codes, they need to be ignored
     {
       if(old_strength > 0)
@@ -244,11 +246,13 @@ void loop(void)
     }
     sensorString = sensorString + "}";
 
-    //Serial.println(sensorString);
+
     String responseString = "";
 
-    if(change)
+    if(change){
       client.post(path, (const char*) sensorString);
+    }
+
 
       unsigned long end = millis();
 
@@ -262,11 +266,11 @@ void loop(void)
         loopCounter++;
     }
 
-    String averageTime = tempStr + "Average runtime: " + (totalTime/loopCounter) + "ms";
-    Serial.println(averageTime);
+    //String averageTime = tempStr + "Average runtime: " + (totalTime/loopCounter) + "ms";
+    //Serial.println(averageTime);
 
-    String averageBattery = tempStr + "Average battery usage: " + ((totalBattery * 3.3)/loopCounter) + "Watts";
-    Serial.println(averageBattery);
+    //String averageBattery = tempStr + "Average battery usage: " + ((totalBattery * 3.3)/loopCounter) + "Watts";
+    //Serial.println(averageBattery);
 
     sleepTimer.reset();
 }
@@ -275,6 +279,8 @@ void updateLimit3(const char *event, const char *data)
 {
   String s = String(data);
   limit_3 = -(s.toInt());
+  String up3 = "Update3: " + String(data);
+  Serial.println(up3);
   //limit_2 = limit_3 - 5;
 }
 
@@ -282,6 +288,8 @@ void updateLimit2(const char *event, const char *data)
 {
   String s = String(data);
   limit_2 = s.toInt();
+  String up2 = "Update2: " + String(data);
+  Serial.println(up2);
   //limit_3 = limit_2 + 5; // Limit 2 and 3 are 5 units apart
 }
 

@@ -186,6 +186,10 @@ void loop(void)
         oldZ = 90;
       if(oldY > 90)
         oldY = 90;
+      if(oldZ < 5)
+        oldZ = 0;
+      if(oldY < 5)
+        oldY = 0;
       if(oldZ >= oldY)
         sensorString = sensorString + ", \"Angle\": " + oldZ;
       else

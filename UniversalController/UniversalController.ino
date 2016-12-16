@@ -149,7 +149,7 @@ os_thread_return_t shakeDetect(void* param){
           endSleep();
         sensorString = tempStr + "Shake at speed  " + speed;
         Serial.println(sensorString);
-        if(mode > 2)
+        if(mode > 3)
           mode = 0;
         else
           mode++;
@@ -218,6 +218,23 @@ os_thread_return_t ledBlink(void* param){
                 delay(200);
                 digitalWrite(LED, HIGH);
                 delay(200);
+                digitalWrite(LED, LOW);
+                delay(1000);
+                break;
+        case 4: digitalWrite(LED, HIGH);
+                delay(100);
+                digitalWrite(LED, LOW);
+                delay(100);
+                digitalWrite(LED, HIGH);
+                delay(100);
+                digitalWrite(LED, LOW);
+                delay(100);
+                digitalWrite(LED, HIGH);
+                delay(100);
+                digitalWrite(LED, LOW);
+                delay(100);
+                digitalWrite(LED, HIGH);
+                delay(100);
                 digitalWrite(LED, LOW);
                 delay(1000);
                 break;
@@ -362,6 +379,16 @@ void loop(void)
     switch(mode){
         // Colour
         case 1:
+                switch(currentZone){
+                  case 0: path = "/Bulb/0/1";
+                          break;
+                  case 1: path = "/Bulb/1/1";
+                          break;
+                  case 2: path = "/Bulb/2/1";
+                          break;
+                  case 3: path = "/Bulb/3/1";
+                          break;
+                }
                 sensorString = "{\"Colour\":";
                 if(currentZ < 30 && !colourChange && !lock){
                   colourChange = true;
@@ -489,7 +516,7 @@ void loop(void)
                 break;
         // Kettle
         case 4:
-                path = tempStr + "/Kettle";
+                path = "/Kettle";
                 if(currentZ < 30 && !lock && !angleChange){
                   angleChange = true;
                   currentKettle = true;
@@ -506,12 +533,16 @@ void loop(void)
                   if(isSleeping)
                     endSleep();
                   if(currentKettle){
-                    sensorString = tempStr + sensorString + "1}";
+                    Serial.println(sensorString);
+                    sensorString = tempStr + sensorString + "{\"Power\":1}";
+                    Serial.println(path);
                     Serial.println(sensorString);
                     client.post(path, (const char*) sensorString, &responseString);
                     Serial.println(responseString);
                   } else {
-                    sensorString = tempStr + sensorString + "0}";
+                    Serial.println(sensorString);
+                    sensorString = tempStr + sensorString + "{\"Power\":0}";
+                    Serial.println(path);
                     Serial.println(sensorString);
                     client.post(path, (const char*) sensorString, &responseString);
                     Serial.println(responseString);
@@ -538,10 +569,10 @@ void loop(void)
     }
 
     String averageTime = tempStr + "Average runtime: " + (totalTime/loopCounter) + "ms";
-    Serial.println(averageTime);
+    //Serial.println(averageTime);
 
     String averageBattery = tempStr + "Average battery usage: " + ((totalBattery * 3.3)/loopCounter) + "Watts";
-    Serial.println(averageBattery);
+    //Serial.println(averageBattery);
 
     delay(500);
 
