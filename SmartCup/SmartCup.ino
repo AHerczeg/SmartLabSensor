@@ -49,6 +49,8 @@ bool ACCELOK = false;
 int cx, cy, cz, ax, ay, az, gx, gy, gz;
 float oldZ = 0;
 float oldY = 0;
+
+int oldAngle = 0;
 double tm; //// Celsius
 
 int maxDegree = 0;
@@ -170,7 +172,9 @@ void loop(void)
     float currentY = abs(getYtiltX(ay, ax)-180);
     String responseString = "";
 
-    if(abs(oldZ - currentZ) > 2 || abs(oldY - currentY) > 2){
+    if(abs(oldZ - currentZ) > 2){
+      Serial.println(oldY);
+      Serial.println(currentY);
       sleepTimer.reset();
       if(isSleeping)
         endSleep();
@@ -182,6 +186,10 @@ void loop(void)
         oldZ = 90;
       if(oldY > 90)
         oldY = 90;
+      if(oldZ < 5)
+        oldZ = 0;
+      if(oldY < 5)
+        oldY = 0;
       if(oldZ >= oldY)
         sensorString = sensorString + ", \"Angle\": " + oldZ;
       else
@@ -191,16 +199,16 @@ void loop(void)
 
       sensorString = sensorString + ", \"Liquid\": " + lPercentage;
       sensorString = sensorString + "}";
-      client.post(path, (const char*) sensorString, &responseString);
-      Particle.publish("photonSensorData",responseString, PRIVATE);
-      Particle.publish("photonSensorData",sensorString, PRIVATE);
+      Serial.println(sensorString);
+      client.post(path, (const char*) sensorString);
+      Serial.println(responseString);
       if(lPercentage <= 0 && !cupDone){
         cupDone = true;
         path = "/FullCups";
         sensorString = tempStr+"{\"CoreID\":\"" + coreID + "\"}";
-        client.post(path, (const char*) sensorString, &responseString);
-        Particle.publish("photonSensorData",sensorString, PRIVATE);
-        Particle.publish("photonSensorData",responseString, PRIVATE);
+        Serial.println(sensorString);
+        client.post(path, (const char*) sensorString);
+        Serial.println(responseString);
       }
     }
 }

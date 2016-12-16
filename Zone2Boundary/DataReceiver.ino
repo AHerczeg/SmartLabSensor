@@ -8,22 +8,17 @@
 
     //Subscribes to sensorData
     Particle.subscribe("photonSensorData", printPhotonSensorData, MY_DEVICES);
-
     lastStrength = WiFi.RSSI();
   }
 
   void loop(void)
   {
     int x = WiFi.RSSI();
-
     if(x != lastStrength){
-      Particle.publish("wifiZone3", (String) x);
+      Particle.publish("wifiZone2", (String) x);
       lastStrength = x;
     }
     delay(1000);
-    Particle.publish("wifiZone3", (String) x);
-    delay(5000);
-
   }
 
   //when sensor is received, photon relays it to visualiser through Serial print statement

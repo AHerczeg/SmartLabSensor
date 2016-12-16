@@ -85,6 +85,21 @@ int limit_2 = 45;
 
 Si1132 si1132 = Si1132();
 
+
+RestClient client = RestClient("sccug-330-04.lancs.ac.uk",8000);
+
+const char* path = "/LocTracking";
+
+unsigned long totalTime = 0;
+
+int totalBattery = 0;
+
+int loopCounter = 0;
+
+Timer sleepTimer(60000, startSleep);
+
+bool isSleeping = false;
+
 //// ***************************************************************************
 
 
@@ -190,55 +205,16 @@ void loop(void)
 
     //// ***********************************************************************
 
-    readWeatherSi7020();
-    readSi1132Sensor();
-
-
-    RestClient client = RestClient("sccug-330-04.lancs.ac.uk",8000);
-
-    const char* path = "/LocTracking";
+    unsigned long start = millis();
 
     String tempStr = "";
-    double sound = readSoundLevel();
+    String sensorString = tempStr+"{\"CoreID\":\"" + getCoreID() + "\"";
     bool change = false;
 
-    String sensorString = tempStr+"{\"CoreID\":\"" + getCoreID() + "\"";
-    double diff = oldTmp-Si7020Temperature;
-/**
-    if(abs(diff) > THRESHOLD)
-    {
-      oldTmp = Si7020Temperature;
-      sensorString = sensorString + ", \"Temp\":"+Si7020Temperature;
-      change = true;
-    }
-
-    diff = oldHmd-Si7020Humidity;
-    if(abs(diff) > THRESHOLD)
-    {
-      oldHmd = Si7020Humidity;
-      sensorString = sensorString + ", \"Humidity\":"+Si7020Humidity;
-      change = true;
-    }
-
-    diff = oldVisible - Si1132Visible;
-    if(abs(diff) > (THRESHOLD*10))
-    {
-      oldVisible = Si1132Visible;
-      sensorString = sensorString + ", \"Light\":" + Si1132Visible;
-      change = true;
-    }
-
-    double soundDiff = sound*1000 - oldSound*1000;
-    diff = lround(soundDiff);
-    if(abs(diff) > lround(THRESHOLD*24))
-    {
-      oldSound = sound;
-      sensorString = sensorString + ", \"Sound\":" + sound;
-      change = true;
-    }
-**/    
     int reading = -(WiFi.RSSI()); //RSSI value is negative, this makes comparisons more readable
     int f = 0;
+
+    Serial.println(reading);
 
     if(reading > 0) // WiFi.RSSI returns positive values as error codes, they need to be ignored
     {
@@ -270,30 +246,51 @@ void loop(void)
     }
     sensorString = sensorString + "}";
 
-    Serial.println(sensorString);
+
     String responseString = "";
 
-    if(change)
-      client.post(path, (const char*) sensorString, &responseString);
+    if(change){
+      client.post(path, (const char*) sensorString);
+    }
 
-    sensorString = sensorString+" "+oldPos+" "+f+" "+reading+" "+limit_3;
-    Particle.publish("photonSensorData",sensorString, PRIVATE);
 
-    delay(1000);
+      unsigned long end = millis();
+
+    if(end-start > 0){
+        totalTime += (end-start);
+        if(!isSleeping){
+          totalBattery += ((end-start) * 18);
+        } else {
+          totalBattery += ((end-start) * 2);
+        }
+        loopCounter++;
+    }
+
+    //String averageTime = tempStr + "Average runtime: " + (totalTime/loopCounter) + "ms";
+    //Serial.println(averageTime);
+
+    //String averageBattery = tempStr + "Average battery usage: " + ((totalBattery * 3.3)/loopCounter) + "Watts";
+    //Serial.println(averageBattery);
+
+    sleepTimer.reset();
 }
 
 void updateLimit3(const char *event, const char *data)
 {
   String s = String(data);
   limit_3 = -(s.toInt());
-  limit_2 = limit_3 - 5;
+  String up3 = "Update3: " + String(data);
+  Serial.println(up3);
+  //limit_2 = limit_3 - 5;
 }
 
 void updateLimit2(const char *event, const char *data)
 {
   String s = String(data);
   limit_2 = s.toInt();
-  limit_3 = limit_2 + 5; // Limit 2 and 3 are 5 units apart
+  String up2 = "Update2: " + String(data);
+  Serial.println(up2);
+  //limit_3 = limit_2 + 5; // Limit 2 and 3 are 5 units apart
 }
 
 String getCoreID(){
@@ -315,58 +312,18 @@ String getCoreID(){
 }
 
 
-int readWeatherSi7020()
-{
-    Si70xx si7020;
-    Si7020OK = si7020.begin(); //// initialises Si7020
-
-    if (Si7020OK)
-    {
-        Si7020Temperature = si7020.readTemperature();
-        Si7020Humidity = si7020.readHumidity();
-    }
-
-    return Si7020OK ? 2 : 0;
+void startSleep(){
+  sleepTimer.stop();
+  isSleeping = true;
+  System.sleep(1);
 }
 
-
-
-///reads UV, visible and InfraRed light level
-void readSi1132Sensor()
-{
-    si1132.begin(); //// initialises Si1132
-    Si1132UVIndex = si1132.readUV() *0.01;
-    Si1132Visible = si1132.readVisible();
-    Si1132InfraRed = si1132.readIR();
-}
-
-//returns sound level measurement in as voltage values (0 to 3.3v)
-float readSoundLevel()
-{
-    unsigned int sampleWindow = 50; // Sample window width in milliseconds (50 milliseconds = 20Hz)
-    unsigned long endWindow = millis() + sampleWindow;  // End of sample window
-
-    unsigned int signalSample = 0;
-    unsigned int signalMin = 4095; // Minimum is the lowest signal below which we assume silence
-    unsigned int signalMax = 0; // Maximum signal starts out the same as the Minimum signal
-
-    // collect data for milliseconds equal to sampleWindow
-    while (millis() < endWindow)
-    {
-        signalSample = analogRead(SOUND);
-        if (signalSample > signalMax)
-        {
-            signalMax = signalSample;  // save just the max levels
-        }
-        else if (signalSample < signalMin)
-        {
-            signalMin = signalSample;  // save just the min levels
-        }
-    }
-
-    //SOUNDV = signalMax - signalMin;  // max - min = peak-peak amplitude
-    SOUNDV = mapFloat((signalMax - signalMin), 0, 4095, 0, 3.3);
-
-    //return 1;
-    return SOUNDV;
+void endSleep(){
+  WiFi.on();
+  WiFi.connect();
+  Spark.connect();
+  Particle.process();
+  delay(500);
+  isSleeping = false;
+  sleepTimer.reset();
 }
