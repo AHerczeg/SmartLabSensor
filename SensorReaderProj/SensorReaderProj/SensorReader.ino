@@ -13,6 +13,8 @@
 #define DEG_TO_RADIANS 0.0174533
 #define PI 3.1415926535
 #define ACCEL_SCALE 2 // +/- 2g
+#define BROADCAST_PORT 8500
+#define DIRECT_PORT 9000
 
 int SENSORDELAY = 500;  //// 500; //3000; // milliseconds (runs x1)
 int EVENTSDELAY = 1000; //// milliseconds (runs x10)
@@ -99,6 +101,7 @@ RestClient client = RestClient("sccug-330-04.lancs.ac.uk",8000);
 const char* path = "/Cup";
 
 String coreID;
+UDP udp;
 
 //// ***************************************************************************
 
@@ -154,6 +157,9 @@ void setup()
     coreID = getCoreID();
 
     sleepTimer.start();
+
+    udp.begin(BROADCAST_PORT);
+    broadcast_presence();
 }
 
 void initialiseMPU9150()
@@ -446,4 +452,47 @@ void endSleep(){
   Particle.publish("photonSensorData",nameString, PRIVATE);
   isSleeping = false;
   sleepTimer.reset();
+}
+
+void broadcast_presence()
+{
+  IPAddress local = WiFi.localIP();
+  IPAddress mask = WiFi.subnetMask();
+  uint8_t m[] = {255 ^ mask[0], 255 ^ mask[1], 255 ^ mask[2], 255 ^ mask[3]};
+  uint8_t bc[] = {local[0] | m[0], local[1] | m[1], local[2] | m[2], local[3] | m[3]};
+  IPAddress broadcast(bc);
+
+  udp.beginPacket(broadcast, BROADCAST_PORT);
+  udp.write('a');
+  udp.endPacket();
+
+  receive_ack();
+}
+
+void receive_ack()
+{
+  int size;
+  char response;
+  int i = 0;
+  IPAddress router;
+
+  do
+  {
+    size = udp.parsePacket();
+  } while(size <= 0); // Add a delay of 120 seconds before retrying
+
+  response = udp.read();
+
+  Particle.publish( "udpPackageTesting",  response);
+  sendID(udp.remoteIP());
+}
+
+void sendID(IPAddress router)
+{
+  TCPClient client;
+  client.connect(router, DIRECT_PORT);
+  Particle.publish( "udpPackageTesting",  "Photon side TCP");
+
+  client.print( System.deviceID() );
+  client.stop();
 }
